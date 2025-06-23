@@ -6,23 +6,14 @@ from selenium.webdriver.edge.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 import time, os, random
-
-NUM_SEARCHES = 30
-QUERIES = [
-    "news", "weather", "AI", "Python programming", "football", "movies 2025",
-    "Microsoft Edge", "tech news", "meme", "how to cook pasta", "Elon Musk",
-    "machine learning", "stock market", "cat videos", "dog facts", "fitness tips",
-    "travel hacks", "Java vs Python", "moon landing", "latest games", "RTX 5090",
-    "NASA news", "coding interview tips", "best mobile phones", "climate change",
-    "mystery movies", "GTA 6 release", "OpenAI", "productivity hacks", "linux distros"
-]
-
+import getpass
+  
 """!!!!!!!!!!!!!!!! Change these acccording to your system !!!!!!!!!!!!!!!!"""
+your_username = getpass.getuser()
 timeout = 5 # seconds to wait for page load
-your_username = "yatharth"  # Replace with your actual username of the system
-
+ 
 if os.name == 'nt': # Windows
-    user_data_dir = f"C:/Users/{your_username}/AppData/Local/Microsoft/Edge/User Data/Default" # Replace with your actual profile path
+    user_data_dir = f"%AppData%/Local/Microsoft/Edge/User Data/Default" # Replace with your actual profile path
 elif os.name == 'posix': # Linux
     user_data_dir = f"/home/{your_username}/.config/microsoft-edge/Default"  # Replace with your actual profile path
 else:
@@ -40,18 +31,18 @@ def setup_driver():
         edge_options = Options()
         
         # Add common options to avoid detection
-        edge_options.add_argument("--disable-dev-shm-usage")
-        edge_options.add_argument("--disable-blink-features=AutomationControlled")
-        edge_options.add_argument("--disable-extensions")
+        edge_options.add_argument("--no-sandbox") # Bypass OS security model  
+        edge_options.add_argument("--disable-gpu")  # Disable GPU hardware acceleration
+        edge_options.add_argument("--disable-dev-shm-usage") # Overcome limited resource problems
+        edge_options.add_argument("--disable-blink-features=AutomationControlled") # Disable automation features
+        edge_options.add_argument("--disable-extensions") # Disable extensions
         edge_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         edge_options.add_experimental_option("useAutomationExtension", False)
-        edge_options.add_experimental_option("detach", True)
-        
         # Set user agent
         edge_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) edge/119.0.0.0 Safari/537.36")
         
         # Use user data directory for session persistence
-        edge_options.add_argument(f"--user-data-dir={user_data_dir}")
+        edge_options.add_argument(f"--user-data-dir={user_data_dir}") 
 
         # Use user Edge exec/binary location
         edge_options.binary_location = exec_path
@@ -69,34 +60,46 @@ def setup_driver():
 
         return driver
 
-# if already logged in to whatsapp then no need to login again this way
+def start_loop(driver):
+    # Open bing.com
+    driver.get("https://bing.com/")
+    time.sleep(1) # Wait for page to load
+
+    # Open sidebar
+    sidebar_button = WebDriverWait(driver, timeout).until(
+        lambda d: d.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/div')
+    )
+    sidebar_button.click()
+    time.sleep(1) # Wait for sidebar to open and content to load
+
+    # Switch to the iframe
+    iframe_element = WebDriverWait(driver, timeout).until(
+        lambda d: d.find_element(By.XPATH, '//*[@id="rewid-f"]/iframe')
+    )
+    driver.switch_to.frame(iframe_element)
+
+    # Find the container with the links inside the iframe
+    links_container = WebDriverWait(driver, timeout).until(
+        lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[2]')
+    )
+
+    # Find all links within the container
+    reward_links = links_container.find_elements(By.TAG_NAME, 'a')
+    links = [link.get_attribute('href') for link in reward_links] # Get all links
+    # Switch back to the default content
+    driver.switch_to.default_content()
+    for i in range(len(reward_links)):
+        try:
+            driver.get(links[i])
+            print(f"[✓] Opened link {i+1} by navigating to URL.")
+            time.sleep(random.uniform(1, 3)) # Stay on the page for a bit
+        except Exception as e:
+            print(f"[!] Could not navigate to link {i+1}: {e}")
+            print(f"[!] Skipping link {i+1}.")
+            continue # Skip to the next iteration if navigation fails
+
 driver = setup_driver()
+time.sleep(2) # Wait for the driver to initialize
+start_loop(driver)
 
-# Open first tab and perform an initial search
-driver.get("https://bing.com/")
-time.sleep(3)
-
-# Function to perform a single search in a tab
-def search_in_tab(query, tab_index):
-    driver.switch_to.window(driver.window_handles[tab_index])
-    try:
-        search_box = WebDriverWait(driver, timeout).until(
-            lambda d: d.find_element(By.NAME, "q")
-        )
-        search_box.clear()
-        search_box.send_keys(query)
-        search_box.send_keys(Keys.RETURN)
-    except Exception as e:
-        print(f"[!] Error in tab {tab_index}: {e}")
-
-# Open new tabs and perform search
-for i in range(1, NUM_SEARCHES):
-    query = random.choice(QUERIES)
-    driver.execute_script("window.open('https://bing.com');")
-    time.sleep(0.7)  # slight delay between tab openings
-    search_in_tab(query, i)
-
-# Final sleep to let all tabs finish
-time.sleep(10)
-
-print("[✓] All searches completed. You can now close the browser.")
+print("[✓] Task completed. You can now close the browser.")
