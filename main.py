@@ -63,14 +63,14 @@ def setup_driver():
 def start_loop(driver):
     # Open bing.com
     driver.get("https://bing.com/")
-    time.sleep(1) # Wait for page to load
+    time.sleep(2) # Wait for page to load
 
     # Open sidebar
     sidebar_button = WebDriverWait(driver, timeout).until(
         lambda d: d.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/div')
     )
     sidebar_button.click()
-    time.sleep(1) # Wait for sidebar to open and content to load
+    time.sleep(2) # Wait for sidebar to open and content to load
 
     # Switch to the iframe
     iframe_element = WebDriverWait(driver, timeout).until(
@@ -97,6 +97,8 @@ def start_loop(driver):
             print(f"[!] Could not navigate to link {i+1}: {e}")
             print(f"[!] Skipping link {i+1}.")
             continue # Skip to the next iteration if navigation fails
+        finally:
+            time.sleep(random.uniform(3, 5))
 
 driver = setup_driver()
 time.sleep(2) # Wait for the driver to initialize
