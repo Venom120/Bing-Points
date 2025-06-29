@@ -1,9 +1,8 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.edge.options import Options
-from selenium.webdriver.edge.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.edge.service import Service
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 import time, os, random
 import getpass
@@ -13,7 +12,11 @@ your_username = getpass.getuser()
 timeout = 5 # seconds to wait for page load
  
 if os.name == 'nt': # Windows
-    user_data_dir = f"%AppData%/Local/Microsoft/Edge/User Data/Default" # Replace with your actual profile path
+    appdata = os.getenv('APPDATA') # Get the AppData path
+    if appdata is None:
+        raise EnvironmentError("APPDATA environment variable is not set. Please check your system configuration.")
+    user_data_dir = os.path.join(appdata, "Local", "Microsoft", "Edge", "User Data", "Default")  # Replace with your actual profile path
+    print(f"User data directory: {user_data_dir}")
 elif os.name == 'posix': # Linux
     user_data_dir = f"/home/{your_username}/.config/microsoft-edge/Default"  # Replace with your actual profile path
 else:
@@ -38,6 +41,7 @@ def setup_driver():
         edge_options.add_argument("--disable-extensions") # Disable extensions
         edge_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         edge_options.add_experimental_option("useAutomationExtension", False)
+
         # Set user agent
         edge_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) edge/119.0.0.0 Safari/537.36")
         
@@ -62,7 +66,7 @@ def setup_driver():
 
 def start_loop(driver):
     # Open bing.com
-    driver.get("https://bing.com/")
+    driver.get("https://www.bing.com/")
     time.sleep(2) # Wait for page to load
 
     # Open sidebar
@@ -91,7 +95,7 @@ def start_loop(driver):
     for i in range(len(reward_links)):
         try:
             driver.get(links[i])
-            print(f"[✓] Opened link {i+1} by navigating to URL.")
+            print(f"[OK] Opened link {i+1} by navigating to URL.")
             time.sleep(random.uniform(1, 3)) # Stay on the page for a bit
         except Exception as e:
             print(f"[!] Could not navigate to link {i+1}: {e}")
@@ -100,8 +104,14 @@ def start_loop(driver):
         finally:
             time.sleep(random.uniform(3, 5))
 
-driver = setup_driver()
-time.sleep(2) # Wait for the driver to initialize
-start_loop(driver)
+try:
+    driver = setup_driver()
+    time.sleep(2) # Wait for the driver to initialize
+    start_loop(driver)
+except Exception as e:
+    print(f"[!] An error occurred: {e}")
+finally:
+    if 'driver' in locals():
+        driver.quit()
 
-print("[✓] Task completed. You can now close the browser.")
+print("[OK] Task completed. You can now close the browser.")
