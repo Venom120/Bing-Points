@@ -16,7 +16,6 @@ if os.name == 'nt': # Windows
     if appdata is None:
         raise EnvironmentError("APPDATA environment variable is not set. Please check your system configuration.")
     user_data_dir = os.path.join(appdata, "Local", "Microsoft", "Edge", "User Data", "Default")  # Replace with your actual profile path
-    print(f"User data directory: {user_data_dir}")
 elif os.name == 'posix': # Linux
     user_data_dir = f"/home/{your_username}/.config/microsoft-edge/Default"  # Replace with your actual profile path
 else:
@@ -41,6 +40,7 @@ def setup_driver():
         edge_options.add_argument("--disable-extensions") # Disable extensions
         edge_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         edge_options.add_experimental_option("useAutomationExtension", False)
+        # edge_options.add_experimental_option("detach", True) # Keep the browser open after script execution
 
         # Set user agent
         edge_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) edge/119.0.0.0 Safari/537.36")
@@ -83,9 +83,16 @@ def start_loop(driver):
     driver.switch_to.frame(iframe_element)
 
     # Find the container with the links inside the iframe
-    links_container = WebDriverWait(driver, timeout).until(
-        lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[2]')
-    )
+    if os.name == 'nt': # Windows
+        links_container = WebDriverWait(driver, timeout).until(
+            lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[3]')
+        )
+    elif os.name == 'posix': # Linux
+        links_container = WebDriverWait(driver, timeout).until(
+            lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[2]')
+        )
+    else:
+        raise Exception("Unsupported OS. Please update the XPATH accordingly.")
 
     # Find all links within the container
     reward_links = links_container.find_elements(By.TAG_NAME, 'a')
