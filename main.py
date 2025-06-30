@@ -116,8 +116,14 @@ def start_loop(driver):
 gained=0
 driver = setup_driver()
 time.sleep(2) # Wait for the driver to initialize
-gained = start_loop(driver)
+# gained = start_loop(driver)
 
-print("[OK] Task completed. You can now close the browser.")
-
+print("[OK] Task completed.")
 print(f"\n[INFO] Points gained: {gained}")
+
+choice = input("Press Enter to close the browser or type 'open' to keep it open: ")
+if choice.lower() == 'open':
+    print("[INFO] Browser will remain open.")
+else:
+    print("[INFO] Closed the browser.")
+    driver.quit() # Close the browser
