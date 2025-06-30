@@ -40,7 +40,7 @@ def setup_driver():
         edge_options.add_argument("--disable-extensions") # Disable extensions
         edge_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         edge_options.add_experimental_option("useAutomationExtension", False)
-        # edge_options.add_experimental_option("detach", True) # Keep the browser open after script execution
+        edge_options.add_experimental_option("detach", True) # Keep the browser open after script execution
 
         # Set user agent
         edge_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) edge/119.0.0.0 Safari/537.36")
@@ -69,6 +69,9 @@ def start_loop(driver):
     driver.get("https://www.bing.com/")
     time.sleep(2) # Wait for page to load
 
+    points_before = driver.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/span[1]').text
+    print(f"[INFO] Points before: {points_before}")
+
     # Open sidebar
     sidebar_button = WebDriverWait(driver, timeout).until(
         lambda d: d.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/div')
@@ -83,16 +86,9 @@ def start_loop(driver):
     driver.switch_to.frame(iframe_element)
 
     # Find the container with the links inside the iframe
-    if os.name == 'nt': # Windows
-        links_container = WebDriverWait(driver, timeout).until(
-            lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[3]')
-        )
-    elif os.name == 'posix': # Linux
-        links_container = WebDriverWait(driver, timeout).until(
-            lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[2]')
-        )
-    else:
-        raise Exception("Unsupported OS. Please update the XPATH accordingly.")
+    links_container = WebDriverWait(driver, timeout).until(
+        lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[3]')
+    )
 
     # Find all links within the container
     reward_links = links_container.find_elements(By.TAG_NAME, 'a')
@@ -111,14 +107,17 @@ def start_loop(driver):
         finally:
             time.sleep(random.uniform(3, 5))
 
-try:
-    driver = setup_driver()
-    time.sleep(2) # Wait for the driver to initialize
-    start_loop(driver)
-except Exception as e:
-    print(f"[!] An error occurred: {e}")
-finally:
-    if 'driver' in locals():
-        driver.quit()
+    # After opening all links, check points again
+    points_after = driver.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/span[1]').text
+    print(f"[INFO] Points after: {points_after}")
+
+    return int(points_after) - int(points_before)
+
+gained=0
+driver = setup_driver()
+time.sleep(2) # Wait for the driver to initialize
+gained = start_loop(driver)
 
 print("[OK] Task completed. You can now close the browser.")
+
+print(f"\n[INFO] Points gained: {gained}")
