@@ -116,7 +116,7 @@ def start_loop(driver):
 gained=0
 driver = setup_driver()
 time.sleep(2) # Wait for the driver to initialize
-# gained = start_loop(driver)
+gained = start_loop(driver)
 
 print("[OK] Task completed.")
 print(f"\n[INFO] Points gained: {gained}")
