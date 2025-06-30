@@ -108,6 +108,9 @@ def start_loop(driver):
             time.sleep(random.uniform(3, 5))
 
     # After opening all links, check points again
+    driver.get("https://www.bing.com/")
+    time.sleep(2) # Wait for page to load
+
     points_after = driver.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/span[1]').text
     print(f"[INFO] Points after: {points_after}")
 
