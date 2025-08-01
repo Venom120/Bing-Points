@@ -10,12 +10,13 @@ import getpass
 """!!!!!!!!!!!!!!!! Change these acccording to your system !!!!!!!!!!!!!!!!"""
 your_username = getpass.getuser()
 timeout = 5 # seconds to wait for page load
+profile_name = "Profile 2" # Change this to your Edge profile name if needed (can use 'Default' for the default profile)
  
 if os.name == 'nt': # Windows
-    appdata = os.getenv('APPDATA') # Get the AppData path
+    appdata = os.path.dirname(os.getenv('APPDATA'))
     if appdata is None:
         raise EnvironmentError("APPDATA environment variable is not set. Please check your system configuration.")
-    user_data_dir = os.path.join(appdata, "Local", "Microsoft", "Edge", "User Data", "Default")  # Replace with your actual profile path
+    user_data_dir = os.path.join(appdata, "Local", "Microsoft", "Edge", "User Data", profile_name)  # Replace with your actual profile path
 elif os.name == 'posix': # Linux
     user_data_dir = f"/home/{your_username}/.config/microsoft-edge/Default"  # Replace with your actual profile path
 else:
@@ -23,9 +24,9 @@ else:
 
 # Specify Edge exec/binary location
 if os.name == 'nt': # Windows
-    exec_path= r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" # Replace with your actual profile path
+    exec_path= r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" # Replace with your actual executable path
 else: # Linux
-    exec_path = "/usr/bin/microsoft-edge-stable" # Replace with your actual profile path
+    exec_path = "/usr/bin/microsoft-edge-stable" # Replace with your actual executable path
 
 
 def setup_driver():
@@ -52,7 +53,15 @@ def setup_driver():
         edge_options.binary_location = exec_path
         
         # Initialize the driver
-        service = Service(EdgeChromiumDriverManager().install())
+        try:
+            service = Service(EdgeChromiumDriverManager().install())
+        except Exception as e:
+            print(f"[!] Error installing Edge driver")
+            print("[!] Rolling back to using user defined Edge driver path.")
+
+            # Change this to your downloaded Edge driver path
+            service = Service(executable_path="D:/PATH/msedgedriver.exe")
+        
         driver = webdriver.Edge(service=service, options=edge_options)
         driver.set_window_size(1280, 800)
         
@@ -87,7 +96,7 @@ def start_loop(driver):
 
     # Find the container with the links inside the iframe
     links_container = WebDriverWait(driver, timeout).until(
-        lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[3]')
+        lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[6]/div/a/div/div[2]/div[3]')
     )
 
     # Find all links within the container
