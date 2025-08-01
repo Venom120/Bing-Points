@@ -17,10 +17,8 @@ if os.name == 'nt': # Windows
     if appdata is None:
         raise EnvironmentError("APPDATA environment variable is not set. Please check your system configuration.")
     user_data_dir = os.path.join(appdata, "Local", "Microsoft", "Edge", "User Data", profile_name)  # Replace with your actual profile path
-elif os.name == 'posix': # Linux
+else: # Linux
     user_data_dir = f"/home/{your_username}/.config/microsoft-edge/Default"  # Replace with your actual profile path
-else:
-    raise Exception("Unsupported OS. Please update the user_data_dir path accordingly.") 
 
 # Specify Edge exec/binary location
 if os.name == 'nt': # Windows
