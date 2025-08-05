@@ -93,9 +93,14 @@ def start_loop(driver):
     driver.switch_to.frame(iframe_element)
 
     # Find the container with the links inside the iframe
-    links_container = WebDriverWait(driver, timeout).until(
-        lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[6]/div/a/div/div[2]/div[3]')
-    )
+    try:
+        links_container = WebDriverWait(driver, timeout).until(
+            lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[3]')
+        )
+    except Exception as e:
+        links_container = WebDriverWait(driver, timeout).until(
+            lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[6]/div/a/div/div[2]/div[3]')
+        )
 
     # Find all links within the container
     reward_links = links_container.find_elements(By.TAG_NAME, 'a')
