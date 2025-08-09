@@ -26,6 +26,13 @@ if os.name == 'nt': # Windows
 else: # Linux
     exec_path = "/usr/bin/microsoft-edge-stable" # Replace with your actual executable path
 
+if os.name == "nt": # Windows
+    driver_path="D:/PATH/msedgedriver.exe"
+else: # Linux
+    driver_path="/bin/msedgedriver"
+
+
+
 
 def setup_driver():
         """Set up and configure the WebDriver"""
@@ -56,12 +63,10 @@ def setup_driver():
         except Exception as e:
             print(f"[!] Error installing Edge driver")
             print("[!] Rolling back to using user defined Edge driver path.")
-
-            # Change this to your downloaded Edge driver path
             if os.name == "nt": # Windows
-                service = Service(executable_path="D:/PATH/msedgedriver.exe")
+                service = Service(executable_path=driver_path)
             else: # Linux
-                service = Service(executable_path="/bin/msedgedriver")
+                service = Service(executable_path=driver_path)
         driver = webdriver.Edge(service=service, options=edge_options)
         driver.set_window_size(1280, 800)
         
