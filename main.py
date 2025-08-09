@@ -58,8 +58,10 @@ def setup_driver():
             print("[!] Rolling back to using user defined Edge driver path.")
 
             # Change this to your downloaded Edge driver path
-            service = Service(executable_path="D:/PATH/msedgedriver.exe")
-        
+            if os.name == "nt": # Windows
+                service = Service(executable_path="D:/PATH/msedgedriver.exe")
+            else: # Linux
+                service = Service(executable_path="/bin/msedgedriver")
         driver = webdriver.Edge(service=service, options=edge_options)
         driver.set_window_size(1280, 800)
         
