@@ -19,6 +19,10 @@ This will automatically install all required dependencies and set up the desktop
     ```bash
     sudo pacman -Sy python python-selenium python-webdriver-manager
     ```
+    if the above doesn't work then use this
+    ```bash
+    yay -S python-selenium python-webdriver-manager
+    ```
     ###### Ubuntu
     ```bash
     sudo apt update
