@@ -27,7 +27,7 @@ else: # Linux
     exec_path = "/usr/bin/microsoft-edge-stable" # Replace with your actual executable path
 
 if os.name == "nt": # Windows
-    driver_path="D:/PATH/msedgedriver.exe"
+    driver_path="msedgedriver.exe"
 else: # Linux
     driver_path="/bin/msedgedriver"
 
@@ -61,7 +61,7 @@ def setup_driver():
         try:
             service = Service(EdgeChromiumDriverManager().install())
         except Exception as e:
-            print(f"[!] Error installing Edge driver")
+            print("[!] Error installing Edge driver")
             print("[!] Rolling back to using user defined Edge driver path.")
             if os.name == "nt": # Windows
                 service = Service(executable_path=driver_path)
@@ -83,7 +83,9 @@ def start_loop(driver):
     driver.get("https://www.bing.com/")
     time.sleep(2) # Wait for page to load
 
-    points_before = driver.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/span[1]').text
+    points_before = WebDriverWait(driver, timeout).until(
+        lambda d: d.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/span[1]')
+    ).text
     print(f"[INFO] Points before: {points_before}")
 
     # Open sidebar
