@@ -81,7 +81,7 @@ def setup_driver():
 def start_loop(driver):
     # Open bing.com
     driver.get("https://www.bing.com/")
-    time.sleep(2) # Wait for page to load
+    time.sleep(3) # Wait for page to load
 
     points_before = WebDriverWait(driver, timeout).until(
         lambda d: d.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/span[1]')
@@ -101,22 +101,46 @@ def start_loop(driver):
     )
     driver.switch_to.frame(iframe_element)
 
+    try:
+        child_divs = driver.find_elements(By.XPATH, '//*[@id="bingRewards"]/div/div[7]/div')
+        child_divs = driver.find_elements(By.XPATH, '//*[@id="bingRewards"]/div/div[8]/div')
+    except Exception as e:
+        child_divs = []
+        print("[!] Could not find the child divs container. Skipping link collection.")
+    print(f"[INFO] Found {len(child_divs)} child divs in the container.")
+            
+    # Collect links from specific divs
+    special_links = []
+    for div in child_divs:
+        div_class = div.get_attribute('class')
+        div_id = div.get_attribute('id')
+        if div_class == "promo_cont slim" or (div_class == "promo_cont " and div_id == "exclusive_promo_cont"):
+            a_tags = div.find_elements(By.TAG_NAME, 'a')
+            for a in a_tags:
+                href = a.get_attribute('href')
+                if href:
+                    special_links.append(href)
+    print(f"[INFO] Found {len(special_links)} special links.")
     # Find the container with the links inside the iframe
     try:
         links_container = WebDriverWait(driver, timeout).until(
             lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[3]')
         )
-    except Exception as e:
         links_container = WebDriverWait(driver, timeout).until(
             lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[6]/div/a/div/div[2]/div[3]')
         )
-
-    # Find all links within the container
-    reward_links = links_container.find_elements(By.TAG_NAME, 'a')
-    links = [link.get_attribute('href') for link in reward_links] # Get all links
+    except Exception as e:
+        links_container = None
+        print("[!] Could not find the links container.")
+    links=[]
+    if links_container is not None:
+        # Find all links within the container
+        reward_links = links_container.find_elements(By.TAG_NAME, 'a')
+        links.extend([link.get_attribute('href') for link in reward_links]) # Get all links
+    links.extend(special_links)
     # Switch back to the default content
     driver.switch_to.default_content()
-    for i in range(len(reward_links)):
+    for i in range(len(links)):
         try:
             driver.get(links[i])
             print(f"[OK] Opened link {i+1} by navigating to URL.")
