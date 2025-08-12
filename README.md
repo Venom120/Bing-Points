@@ -21,13 +21,11 @@
 ## Usage
 
 1.  **Linux:**
-    *   Run the program using:
+    *   Run the program:
+        A desktop entry will be made named 'Bing Points Bot', just run it
+        OR
         ```bash
-        ./bing_points.sh
-        ```
-        or
-        ```bash
-        python3 main.py
+        /usr/bin/bing_points
         ```
 2.  **Windows:**
     *   **First Time Setup:** Double-click `bing_points.bat` to create the virtual environment and install dependencies.
@@ -42,7 +40,7 @@
 
 If you see the following error during execution:
 ```
-[!] Error installing Edge driver"
+[!] Error installing Edge driver
 [!] Rolling back to using user defined Edge driver path.
 ```
 
