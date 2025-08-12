@@ -1,9 +1,4 @@
-# Bing Points - A Python Program
-
-## Important Notes
-
-*   **Do not remove this Git repository folder.**
-
+# Bing Points - An automation for bing points collection
 ## Installation
 
 1.  **Install Dependencies (Linux):**
