@@ -78,6 +78,50 @@ def setup_driver():
 
         return driver
 
+def find_searches(driver):
+    # Find the container with the links inside the iframe
+    searches = []
+    container_links_check = driver.find_element(By.XPATH, '//*[@class="search_earn_card"]/div')
+    if container_links_check.get_attribute('aria-label') == "Offer not Completed":
+        links_container = driver.find_element(By.XPATH, '//*[@class="search_earn_card"]/div/a/div/div[2]/div[3]')
+        # Find all links within the container
+        reward_links = links_container.find_elements(By.TAG_NAME, 'a')
+        searches.extend([link.get_attribute('href') for link in reward_links])
+        print(f"[INFO] Found {len(reward_links)} links.")
+    else:
+        print("[!] No more points to gain from searches today.")
+    return searches
+
+def find_offers(driver):
+    offers = []
+    all_offers = driver.find_elements(By.XPATH, '//*[@class="flyout_control_halfUnit"]/div')
+            
+    for div in all_offers:
+        aria_label = div.get_attribute('aria-label')
+        div_id = div.get_attribute('id')
+        if div_id == "exclusive_promo_cont":
+            # check if this offer is completed or not
+            check_alt = div.find_element(By.TAG_NAME, 'img').get_attribute('alt')
+            if check_alt == "Locked Image":
+                a_tags = div.find_element(By.TAG_NAME, 'a')
+                offers.append(a_tags.get_attribute('href'))
+        elif aria_label is not None and "Offer not Completed" in aria_label:
+            a_tags = div.find_element(By.TAG_NAME, 'a')
+            offers.append(a_tags.get_attribute('href'))
+    print(f"[INFO] Found {len(offers)} offers.")
+    return offers
+
+def open_links(driver, links):
+    for i in range(len(links)):
+        try:
+            driver.get(links[i])
+            print(f"[OK] Opened link {i+1} by navigating to URL.")
+            time.sleep(random.uniform(3, 5)) # Stay on the page for a bit
+        except Exception as e:
+            print(f"[!] Could not navigate to link {i+1}: {e}")
+            print(f"[!] Skipping link {i+1}.")
+            continue # Skip to the next iteration if navigation fails
+    
 def start_loop(driver):
     # Open bing.com
     driver.get("https://www.bing.com/")
@@ -101,60 +145,18 @@ def start_loop(driver):
     )
     driver.switch_to.frame(iframe_element)
 
-    try:
-        child_divs = driver.find_elements(By.XPATH, '//*[@id="bingRewards"]/div/div[7]/div')
-        child_divs = driver.find_elements(By.XPATH, '//*[@id="bingRewards"]/div/div[8]/div')
-    except Exception as e:
-        child_divs = []
-        print("[!] Could not find the child divs container. Skipping link collection.")
-    print(f"[INFO] Found {len(child_divs)} child divs in the container.")
-            
-    # Collect links from specific divs
-    special_links = []
-    for div in child_divs:
-        div_class = div.get_attribute('class')
-        div_id = div.get_attribute('id')
-        if div_class == "promo_cont slim" or (div_class == "promo_cont " and div_id == "exclusive_promo_cont"):
-            a_tags = div.find_elements(By.TAG_NAME, 'a')
-            for a in a_tags:
-                href = a.get_attribute('href')
-                if href:
-                    special_links.append(href)
-    print(f"[INFO] Found {len(special_links)} special links.")
-    # Find the container with the links inside the iframe
-    try:
-        links_container = WebDriverWait(driver, timeout).until(
-            lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[5]/div/a/div/div[2]/div[3]')
-        )
-        links_container = WebDriverWait(driver, timeout).until(
-            lambda d: d.find_element(By.XPATH, '//*[@id="bingRewards"]/div/div[6]/div/a/div/div[2]/div[3]')
-        )
-    except Exception as e:
-        links_container = None
-        print("[!] Could not find the links container.")
-    links=[]
-    if links_container is not None:
-        # Find all links within the container
-        reward_links = links_container.find_elements(By.TAG_NAME, 'a')
-        links.extend([link.get_attribute('href') for link in reward_links]) # Get all links
-    links.extend(special_links)
+    links = []
+    links.extend(find_searches(driver))
+    links.extend(find_offers(driver))
+
     # Switch back to the default content
     driver.switch_to.default_content()
-    for i in range(len(links)):
-        try:
-            driver.get(links[i])
-            print(f"[OK] Opened link {i+1} by navigating to URL.")
-            time.sleep(random.uniform(1, 3)) # Stay on the page for a bit
-        except Exception as e:
-            print(f"[!] Could not navigate to link {i+1}: {e}")
-            print(f"[!] Skipping link {i+1}.")
-            continue # Skip to the next iteration if navigation fails
-        finally:
-            time.sleep(random.uniform(3, 5))
+
+    # open_links(driver, links)
 
     # After opening all links, check points again
     driver.get("https://www.bing.com/")
-    time.sleep(2) # Wait for page to load
+    time.sleep(3) # Wait for page to load
 
     points_after = driver.find_element(By.XPATH, '//*[@id="rh_rwm"]/div/span[1]').text
     print(f"[INFO] Points after: {points_after}")
