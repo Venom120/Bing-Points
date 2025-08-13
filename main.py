@@ -152,7 +152,7 @@ def start_loop(driver):
     # Switch back to the default content
     driver.switch_to.default_content()
 
-    # open_links(driver, links)
+    open_links(driver, links)
 
     # After opening all links, check points again
     driver.get("https://www.bing.com/")
