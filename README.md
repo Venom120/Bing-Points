@@ -64,28 +64,13 @@ This will automatically install all required dependencies and set up the desktop
     2.  Move the shortcut to a convenient location, such as your Desktop or a folder in your PATH.
     3.  Double-click the shortcut
 
-## Edge Driver Installation (Manual)
+## Edge Driver Installation
 
-If you see the following error during execution:
-```
-[!] Error installing Edge driver
-[!] Rolling back to using user defined Edge driver path.
-```
+For Windows users, the program will automatically prompt you to select the `msedgedriver.exe` file the first time you run it. This path will then be saved locally in a `config.json` file, so you won't need to select it again.
 
-You will need to manually download the Microsoft Edge WebDriver from the official [Microsoft website](https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver) and place the executable in:
+If you encounter issues or are a Linux user, you may still need to manually download the Microsoft Edge WebDriver from the official [Microsoft website](https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver) and place the executable in:
 *   `/bin/msedgedriver` (Linux)
-*   A directory in your PATH (Windows)
-
-## System Compatibility
-
-This program is primarily designed for Manjaro Linux and Arch-based systems, but should work on other Linux distributions and Windows as well. If you encounter issues, please modify the variables under the following section in `main.py` to match your system's configuration:
-
-```python
-"""!!!!!!!!!!!!!!!! Change these acccording to your system !!!!!!!!!!!!!!!!"""
-# Example variables to change
-# driver_path = "/usr/bin/msedgedriver"
-# ... other variables
-```
+*   A directory in your PATH (Windows, if not using the automated prompt)
 
 ## Contributing
 

@@ -9,7 +9,12 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 import time, os, random
 import getpass
 import re
-  
+import json
+from tkinter import filedialog
+import tkinter as tk
+
+CONFIG_FILE = "config.json"
+
 """!!!!!!!!!!!!!!!! Change these acccording to your system !!!!!!!!!!!!!!!!"""
 your_username = getpass.getuser()
 timeout = 5 # seconds to wait for page load
@@ -29,8 +34,43 @@ if os.name == 'nt': # Windows
 else: # Linux
     exec_path = "/usr/bin/microsoft-edge-stable" # Replace with your actual executable path
 
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_config(config):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=4)
+
+def get_edge_driver_path():
+    config = load_config()
+    driver_path = config.get("driver_path")
+
+    if driver_path and os.path.exists(driver_path):
+        print(f"[INFO] Using saved Edge driver path: {driver_path}")
+        return driver_path
+    else:
+        print("[INFO] Edge driver path not found or invalid. Please select the msedgedriver.exe file.")
+        root = tk.Tk()
+        root.withdraw() # Hide the main window
+        file_path = filedialog.askopenfilename(
+            title="Select msedgedriver.exe",
+            filetypes=[("Edge Driver Executable", "msedgedriver.exe")]
+        )
+        root.destroy() # Destroy the Tkinter root window
+        if file_path:
+            config["driver_path"] = file_path
+            save_config(config)
+            print(f"[INFO] Saved Edge driver path: {file_path}")
+            return file_path
+        else:
+            print("[!] No Edge driver selected. Exiting.")
+            exit()
+
 if os.name == "nt": # Windows
-    driver_path="msedgedriver.exe"
+    driver_path = get_edge_driver_path()
 else: # Linux
     driver_path="/bin/msedgedriver"
 
@@ -123,35 +163,22 @@ def get_trending_searches(driver):
 def find_offers(driver):
     offers = []
     all_offers_div = driver.find_elements(By.XPATH, '//*[@class="flyout_control_halfUnit"]')[-1]
-    all_offers = all_offers_div.find_elements(By.XPATH, './div')
-    print(len(all_offers))
-            
+    all_offers = all_offers_div.find_elements(By.XPATH, './div')            
     for div in all_offers:
-        aria_label = div.get_attribute('aria-label')
+        aria_label = div.get_attribute("aria-label")
         div_id = div.get_attribute('id')
         if div_id == "exclusive_promo_cont":
             # check if this offer is completed or not
             check_alt = div.find_element(By.TAG_NAME, 'img').get_attribute('alt')
             if check_alt == "Locked Image":
                 a_tags = div.find_element(By.TAG_NAME, 'a')
-                offers.append(a_tags.get_attribute('href'))
+                offers.append((a_tags, aria_label.split("-")[0].strip())) # Append tuple (element, offer_name)
         elif aria_label is not None and "Offer not Completed" in aria_label:
             a_tags = div.find_element(By.TAG_NAME, 'a')
-            offers.append(a_tags.get_attribute('href'))
+            offers.append((a_tags, aria_label.split("-")[0].strip())) # Append tuple (element, offer_name)
     print(f"[INFO] Found {len(offers)} offers.")
     return offers
 
-def open_links(driver, links):
-    for i in range(len(links)):
-        try:
-            driver.get(links[i])
-            print(f"[OK] Opened link {i+1} by navigating to URL.")
-            time.sleep(random.uniform(3, 5)) # Stay on the page for a bit
-        except Exception as e:
-            print(f"[!] Could not navigate to link {i+1}: {e}")
-            print(f"[!] Skipping link {i+1}.")
-            continue # Skip to the next iteration if navigation fails
-    
 def perform_trending_searches(driver, initial_tab):
     trending_searches = get_trending_searches(driver)
     print(f"[INFO] Retrieved {len(trending_searches)} trending searches.")
@@ -207,128 +234,63 @@ def collect_special_offers(driver):
     iframe_element = WebDriverWait(driver, timeout).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="rewid-f"]/iframe'))
     )
+    initial_tab = driver.current_window_handle # Store the initial tab handle
     driver.switch_to.frame(iframe_element)
 
     offers = find_offers(driver)
 
-    # Switch back to the default content
-    driver.switch_to.default_content()
-
     if offers:
-        print(f"[INFO] Found {len(offers)} special offers. Opening them...")
-        open_links(driver, offers)
+        print(f"[INFO] Found {len(offers)} special offers. Processing them...")
+        new_tab_handles = []
+
+        # Click all offers while still in the iframe
+        for i, (offer_element, offer_name) in enumerate(offers):
+            print(f"[INFO] Clicking offer {i+1}/{len(offers)}: {offer_name}")
+            try:
+                # Get current window handles before opening a new tab
+                original_handles = driver.window_handles # Get handles before click
+                offer_element.click()
+                time.sleep(2) # Give browser time to open the tab and for the handle to register
+                
+                # Find the handle that is not in the original set
+                all_handles_after_click = driver.window_handles
+                new_handle = list(set(all_handles_after_click) - set(original_handles))
+                if new_handle:
+                    new_tab_handles.append(new_handle[0])
+                    print(f"[OK] Opened new tab for offer {i+1}.")
+                else:
+                    print(f"[!] Could not open new tab for offer {i+1}. It might have opened in the current tab or failed.")
+                
+            except Exception as e:
+                print(f"[!] Error clicking offer {i+1} ({offer_name}): {e}")
+                print(f"[!] Skipping offer {i+1}.")
+                continue # Skip to the next offer
+        
+        # Now, switch back to default content before processing new tabs
+        driver.switch_to.default_content()
+        time.sleep(1.25)
+        print("[INFO] Switched back to default content.")
+        
+        # Process each new tab
+        for i, handle in enumerate(new_tab_handles):
+            try:
+                driver.switch_to.window(handle)
+                print(f"[OK] Switched to new tab for offer {i+1}.")
+                time.sleep(random.uniform(3, 5)) # Stay on the page for a bit
+                driver.close() # Close the new tab
+                print(f"[OK] Closed tab for offer {i+1}.")
+                
+            except Exception as e:
+                print(f"[!] Error processing new tab for offer {i+1}: {e}")
+                print(f"[!] Attempting to switch back to initial tab.")
+                try:
+                    driver.switch_to.window(initial_tab)
+                except Exception as e_switch:
+                    print(f"[!] Critical: Could not switch back to initial tab: {e_switch}")
+                continue
     else:
         print("[INFO] No special offers found.")
-
-def start_loop(driver):
-    gained_points = 0
-    trending_searches = get_trending_searches(driver) # Uncommented this line
-    print(f"[INFO] Retrieved {len(trending_searches)} trending searches.")
-
-    # Get initial points
-    driver.get("https://www.bing.com/")
-    time.sleep(3) # Wait for page to load
-
-    points_before_str = "0"
-    try:
-        points_element = WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.XPATH, '//*[@id="rh_rwm"]/div/span[1]'))
-        )
-        points_before_str = points_element.text
-    except Exception as e:
-        print(f"[!] Could not retrieve initial points: {e}")
-        print("[!] Setting points before to 0.")
-    
-    points_before = int(points_before_str.replace(',', ''))
-    print(f"[INFO] Points before searches: {points_before}")
-
-    initial_tab = driver.current_window_handle
-
-    for i, search_term in enumerate(trending_searches):
-        print(f"[INFO] Performing search {i+1}/{len(trending_searches)}: {search_term}")
-
-        # Get current window handles before opening a new tab
-        original_handles = driver.window_handles
-
-        # Open a new tab and navigate to Bing
-        driver.execute_script("window.open('https://www.bing.com/', '_blank');")
-        time.sleep(1) # Give browser time to open the tab and for the handle to register
-
-        # Get all handles after opening new tab
-        all_handles_after_open = driver.window_handles
-
-        # Find the handle that is not in the original set
-        new_tab_handle = list(set(all_handles_after_open) - set(original_handles))[0]
-        driver.switch_to.window(new_tab_handle)
-        
-        time.sleep(random.uniform(1, 3))
-        
-        try:
-            search_box = WebDriverWait(driver, timeout).until(
-                EC.presence_of_element_located((By.NAME, "q"))
-            )
-            search_box.send_keys(search_term)
-            search_box.send_keys(Keys.RETURN)
-            print(f"[OK] Searched for '{search_term}'.")
-            time.sleep(random.uniform(3, 5)) # Wait for search results to load
-        except Exception as e:
-            print(f"[!] Error performing search for '{search_term}': {e}")
-            driver.close() # Close current problematic tab
-            driver.switch_to.window(initial_tab) # Switch back to initial tab
-            continue
-
-        # Close the current (newly opened) tab after search. This is the "previous tab" where the search was just executed.
-        driver.close()
-        # Always switch back to the initial tab for the next iteration to maintain a consistent state.
-        driver.switch_to.window(initial_tab)
-
-    # Now handle special offers
-    print("[INFO] Checking for special offers...")
-    # Open sidebar
-    sidebar_button = WebDriverWait(driver, timeout).until(
-        EC.presence_of_element_located((By.XPATH, '//*[@id="rh_rwm"]/div/div'))
-    )
-    sidebar_button.click()
-    time.sleep(2) # Wait for sidebar to open and content to load
-
-    # Switch to the iframe
-    iframe_element = WebDriverWait(driver, timeout).until(
-        EC.presence_of_element_located((By.XPATH, '//*[@id="rewid-f"]/iframe'))
-    )
-    driver.switch_to.frame(iframe_element)
-
-    offers = find_offers(driver)
-
-    # Switch back to the default content
-    driver.switch_to.default_content()
-
-    if offers:
-        print(f"[INFO] Found {len(offers)} special offers. Opening them...")
-        open_links(driver, offers)
-    else:
-        print("[INFO] No special offers found.")
-
-    # After all searches and offers, re-check points
-    driver.get("https://www.bing.com/")
-    time.sleep(3) # Wait for page to load
-
-    points_after_str = "0"
-    try:
-        points_element = WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.XPATH, '//*[@id="rh_rwm"]/div/span[1]'))
-        )
-        points_after_str = points_element.text
-    except Exception as e:
-        print(f"[!] Could not retrieve points after searches: {e}")
-        print("[!] Setting points after to 0.")
-
-    points_after = int(points_after_str.replace(',', ''))
-    print(f"[INFO] Points after searches: {points_after}")
-
-    gained_points = points_after - points_before
-    print(f"[INFO] Points gained from searches and offers: {gained_points}")
-
-    return gained_points
+    time.sleep(random.uniform(2,3))
 
 gained=0
 driver = setup_driver()
