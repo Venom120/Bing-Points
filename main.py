@@ -191,7 +191,7 @@ def perform_trending_searches(driver, initial_tab):
 
         # Open a new tab and navigate to Bing
         driver.execute_script("window.open('https://www.bing.com/', '_blank');")
-        time.sleep(1) # Give browser time to open the tab and for the handle to register
+        time.sleep(2) # Give browser time to open the tab and for the handle to register
 
         # Get all handles after opening new tab
         all_handles_after_open = driver.window_handles
