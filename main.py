@@ -120,7 +120,7 @@ def setup_driver():
     return driver
 
 def get_trending_searches(driver):
-    """Extracts 25 trending search titles from Google Trends."""
+    """Extracts 20 trending search titles from Google Trends."""
     driver.get("https://trends.google.com/trending?geo=IN")
     time.sleep(timeout)  # Wait for the page to load
 
@@ -135,7 +135,7 @@ def get_trending_searches(driver):
         tr_elements = tbody_element.find_elements(By.TAG_NAME, 'tr')
 
         for i, tr in enumerate(tr_elements):
-            if i >= 25:  # Limit to 25 searches
+            if i >= 20:  # Limit to 20 searches
                 break
             try:
                 # Get the second td element and then the div with class "mZ3RIc"
