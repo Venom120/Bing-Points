@@ -50,15 +50,16 @@ def get_edge_driver_path():
         print(f"[INFO] Using saved Edge driver path: {driver_path}")
         return driver_path
     else:
-        print("[INFO] Edge driver path not found or invalid. Please select the msedgedriver.exe file.")
         root = tk.Tk()
         root.withdraw() # Hide the main window
         if os.name == "nt": # Windows
+            print("[WARN] Edge driver path not found or invalid. Please select the msedgedriver.exe file.")
             file_path = filedialog.askopenfilename(
                 title="Select msedgedriver.exe",
                 filetypes=[("Edge Driver Executable", "msedgedriver.exe")]
             )
         else: # Linux
+            print("[WARN] Edge driver path not found or invalid. Please select the msedgedriver file.")
             file_path = filedialog.askopenfilename(
                 title="Select msedgedriver",
                 filetypes=[("Edge Driver Bin", "msedgedriver")]
