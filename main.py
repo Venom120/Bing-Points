@@ -14,7 +14,8 @@ from tkinter import filedialog
 import tkinter as tk
 
 CONFIG_FILE = "config.json"
-NUMBER_OF_SEARCHES=20
+NUMBER_OF_SEARCHES=10
+HEADLESS=False
 
 """!!!!!!!!!!!!!!!! Change these acccording to your system !!!!!!!!!!!!!!!!"""
 your_username = getpass.getuser()
@@ -76,12 +77,14 @@ def get_edge_driver_path():
             exit()
 
 
-def setup_driver():
+def setup_driver(HEADLESS=False):
     """Set up and configure the WebDriver"""
     edge_options = Options()
     
     # Add common options to avoid detection
-    edge_options.add_argument("--no-sandbox") # Bypass OS security model  
+    if HEADLESS:
+        edge_options.add_argument("--headless=new") # Run in headless mode to disable visible UI
+    edge_options.add_argument("--no-sandbox") # Bypass OS security model
     edge_options.add_argument("--disable-gpu")  # Disable GPU hardware acceleration
     edge_options.add_argument("--disable-dev-shm-usage") # Overcome limited resource problems
     edge_options.add_argument("--disable-blink-features=AutomationControlled") # Disable automation features
@@ -118,7 +121,7 @@ def setup_driver():
     return driver
 
 def get_trending_searches(driver):
-    """Extracts 20(default) trending search titles from Google Trends."""
+    """Extracts 10(default) trending search titles from Google Trends."""
     driver.get("https://trends.google.com/trending?geo=IN")
     time.sleep(timeout)  # Wait for the page to load
 
@@ -133,7 +136,7 @@ def get_trending_searches(driver):
         tr_elements = tbody_element.find_elements(By.TAG_NAME, 'tr')
 
         for i, tr in enumerate(tr_elements):
-            if i >= NUMBER_OF_SEARCHES:  # Limit to 20(default) searches
+            if i >= NUMBER_OF_SEARCHES:  # Limit to 10(default) searches
                 break
             try:
                 # Get the second td element and then the div with class "mZ3RIc"
@@ -189,7 +192,7 @@ def perform_trending_searches(driver, initial_tab):
 
         # Open a new tab and navigate to Bing
         driver.execute_script("window.open('https://www.bing.com/', '_blank');")
-        time.sleep(2) # Give browser time to open the tab and for the handle to register
+        time.sleep(1.25) # Give browser time to open the tab and for the handle to register
 
         # Get all handles after opening new tab
         all_handles_after_open = driver.window_handles
@@ -290,24 +293,28 @@ def collect_special_offers(driver):
         print("[INFO] No special offers found.")
     time.sleep(random.uniform(2,3))
 
-gained=0
-driver = setup_driver()
-time.sleep(2) # Wait for the driver to initialize
 
-total_gained_points = 0
+
+""" --- MAIN --- """
+
 choice_yes = re.compile(r"^(yes|y)$", re.IGNORECASE)
 choice_no = re.compile(r"^(no|n)$", re.IGNORECASE)
+
+if choice_yes.match(input("\nWant to run the browser in background? (yes/no): ")):
+    HEADLESS=True
+
 while True:
     choice_search = input("\nDo you want to collect points from trending searches? (yes/no): ").lower()
-    if choice_yes.match(choice_search) or choice_no.match(choice_search):
+    if choice_yes.match(choice_search):
+        count = int(input("\nHow many searches? (default=10): "))
+        if count:
+            NUMBER_OF_SEARCHES=count
+            print(f"[INFO] Will search {NUMBER_OF_SEARCHES} trends on bing!!")
+        break
+    elif choice_no.match(choice_search):
         break
     else:
         print("Invalid input. Please enter 'yes' or 'no'.")
-
-count = int(input("\nHow many searches? (default=20): "))
-if count:
-    NUMBER_OF_SEARCHES=count
-    print(f"[INFO] Will search {NUMBER_OF_SEARCHES} trends on bing!!")
 
 while True:
     choice_offers = input("\nDo you want to collect points from special offers? (yes/no): ").lower()
@@ -316,6 +323,8 @@ while True:
     else:
         print("Invalid input. Please enter 'Y/N'.")
 
+driver = setup_driver(HEADLESS)
+time.sleep(2) # Wait for the driver to initialize
 driver.get("https://www.bing.com/")
 time.sleep(3) # Wait for page to load
 
@@ -361,12 +370,19 @@ except Exception as e:
 points_after = int(points_after_str.replace(',', ''))
 print(f"[INFO] Points after all activities: {points_after}")
 
-total_gained_points = points_after - points_before
-print(f"\n[INFO] Total points gained: {total_gained_points}")
+try:
+    TOTAL_GAINED_POINTS = points_after - points_before
+    print(f"\n[INFO] Total points gained: {TOTAL_GAINED_POINTS}")
+except Exception as e:
+    print(f"[!] Cannot calculate Total gained points!")
 
-choice_close = input("Press Enter to close the browser or type 'open' to keep it open: ").lower()
-if choice_close == 'open':
-    print("[INFO] Browser will remain open.")
-else:
+if HEADLESS:
     print("[INFO] Closed the browser.")
     driver.quit() # Close the browser
+else:
+    choice_close = input("\nPress 'Enter' to close the browser or type 'open' to keep it open: ").lower()
+    if choice_close == 'open':
+        print("[INFO] Browser will remain open.")
+    else:
+        print("[INFO] Closed the browser. Have fun BINGING!!! will meet you tomorrow ;)")
+        driver.quit() # Close the browser
