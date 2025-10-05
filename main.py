@@ -14,6 +14,7 @@ from tkinter import filedialog
 import tkinter as tk
 
 CONFIG_FILE = "config.json"
+NUMBER_OF_SEARCHES=20
 
 """!!!!!!!!!!!!!!!! Change these acccording to your system !!!!!!!!!!!!!!!!"""
 your_username = getpass.getuser()
@@ -40,9 +41,6 @@ def load_config():
             return json.load(f)
     return {}
 
-def save_config(config):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(config, f, indent=4)
 
 def get_edge_driver_path():
     config = load_config()
@@ -55,24 +53,26 @@ def get_edge_driver_path():
         print("[INFO] Edge driver path not found or invalid. Please select the msedgedriver.exe file.")
         root = tk.Tk()
         root.withdraw() # Hide the main window
-        file_path = filedialog.askopenfilename(
-            title="Select msedgedriver.exe",
-            filetypes=[("Edge Driver Executable", "msedgedriver.exe")]
-        )
+        if os.name == "nt": # Windows
+            file_path = filedialog.askopenfilename(
+                title="Select msedgedriver.exe",
+                filetypes=[("Edge Driver Executable", "msedgedriver.exe")]
+            )
+        else: # Linux
+            file_path = filedialog.askopenfilename(
+                title="Select msedgedriver",
+                filetypes=[("Edge Driver Bin", "msedgedriver")]
+            )
         root.destroy() # Destroy the Tkinter root window
         if file_path:
             config["driver_path"] = file_path
-            save_config(config)
-            print(f"[INFO] Saved Edge driver path: {file_path}")
+            with open(CONFIG_FILE, 'w') as f:
+                json.dump(config, f, indent=4)
+                print(f"[INFO] Saved Edge driver path: {file_path}")
             return file_path
         else:
             print("[!] No Edge driver selected. Exiting.")
             exit()
-
-if os.name == "nt": # Windows
-    driver_path = get_edge_driver_path()
-else: # Linux
-    driver_path="/bin/msedgedriver"
 
 
 def setup_driver():
@@ -104,10 +104,7 @@ def setup_driver():
     except Exception as e:
         print("[!] Error installing Edge driver")
         print("[!] Rolling back to using user defined Edge driver path.")
-        if os.name == "nt": # Windows
-            service = Service(executable_path=driver_path)
-        else: # Linux
-            service = Service(executable_path=driver_path)
+        service = Service(executable_path=get_edge_driver_path())
     driver = webdriver.Edge(service=service, options=edge_options)
     driver.set_window_size(1280, 800)
     
@@ -120,7 +117,7 @@ def setup_driver():
     return driver
 
 def get_trending_searches(driver):
-    """Extracts 20 trending search titles from Google Trends."""
+    """Extracts 20(default) trending search titles from Google Trends."""
     driver.get("https://trends.google.com/trending?geo=IN")
     time.sleep(timeout)  # Wait for the page to load
 
@@ -135,7 +132,7 @@ def get_trending_searches(driver):
         tr_elements = tbody_element.find_elements(By.TAG_NAME, 'tr')
 
         for i, tr in enumerate(tr_elements):
-            if i >= 20:  # Limit to 20 searches
+            if i >= NUMBER_OF_SEARCHES:  # Limit to 20(default) searches
                 break
             try:
                 # Get the second td element and then the div with class "mZ3RIc"
@@ -300,18 +297,23 @@ total_gained_points = 0
 choice_yes = re.compile(r"^(yes|y)$", re.IGNORECASE)
 choice_no = re.compile(r"^(no|n)$", re.IGNORECASE)
 while True:
-    choice_search = input("Do you want to collect points from trending searches? (yes/no): ").lower()
+    choice_search = input("\nDo you want to collect points from trending searches? (yes/no): ").lower()
     if choice_yes.match(choice_search) or choice_no.match(choice_search):
         break
     else:
         print("Invalid input. Please enter 'yes' or 'no'.")
 
+count = int(input("\nHow many searches? (default=20): "))
+if count:
+    NUMBER_OF_SEARCHES=count
+    print(f"[INFO] Will search {NUMBER_OF_SEARCHES} trends on bing!!")
+
 while True:
-    choice_offers = input("Do you want to collect points from special offers? (yes/no): ").lower()
+    choice_offers = input("\nDo you want to collect points from special offers? (yes/no): ").lower()
     if choice_yes.match(choice_offers) or choice_no.match(choice_offers):
         break
     else:
-        print("Invalid input. Please enter 'yes' or 'no'.")
+        print("Invalid input. Please enter 'Y/N'.")
 
 driver.get("https://www.bing.com/")
 time.sleep(3) # Wait for page to load
