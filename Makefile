@@ -1,7 +1,6 @@
 .PHONY: install uninstall
 
 install:
-	chmod +rx ./bing_points.sh
 	python -m venv .venv
 	source .venv/bin/activate && pip install -r req.txt
 	cp ./bing_points.desktop /usr/share/applications/bing_points.desktop
