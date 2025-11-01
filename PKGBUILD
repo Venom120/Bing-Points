@@ -22,8 +22,7 @@ package() {
   # Install the desktop entry
   install -Dm644 bing_points.desktop "$pkgdir/usr/share/applications/bing_points.desktop"
 
-  # Install the rest of the project files to /usr/share/bing_points
+  # Install the rest of the project files to /usr/share/bing_points/
   install -d "$pkgdir/usr/share/bing_points"
   cp -r ./* "$pkgdir/usr/share/bing_points/"
-  rm "$pkgdir/usr/share/bing_points/bing_points.desktop"
 }

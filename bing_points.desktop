@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Bing Points Bot
-Exec=python /usr/share/bing_points/main.py
-Terminal=true
+Exec=/usr/share/bing_points/bing_points.sh
+Terminal=false
 Icon=utilities-terminal
 Categories=Utility;

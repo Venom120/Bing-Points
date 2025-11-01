@@ -1,0 +1,26 @@
+2025-11-01 23:37:12,794 - INFO - Logging initialized.
+2025-11-01 23:37:12,829 - INFO - Loading config from config.json
+2025-11-01 23:37:19,600 - INFO - Saving configuration...
+2025-11-01 23:37:19,600 - INFO - Configuration saved successfully.
+2025-11-01 23:37:21,782 - INFO - Starting bot...
+2025-11-01 23:37:21,782 - INFO - [1/5] Setting up Edge driver...
+2025-11-01 23:37:21,783 - INFO - Attempting driver install via webdriver-manager...
+2025-11-01 23:37:21,783 - INFO - ====== WebDriver manager ======
+2025-11-01 23:37:21,851 - INFO - Get LATEST edgedriver version for Edge 142.0.3595
+2025-11-01 23:37:26,901 - INFO - webdriver-manager failed: Could not reach host. Are you offline?. Trying saved path.
+2025-11-01 23:37:26,901 - INFO - Using saved driver path: /bin/msedgedriver
+2025-11-01 23:37:32,464 - INFO - [2/5] Navigating to Bing.com...
+2025-11-01 23:37:35,798 - INFO - [3/5] Retrieving initial points...
+2025-11-01 23:37:36,677 - INFO - Points before: 11206
+2025-11-01 23:37:36,678 - INFO - [4/5] Skipping searches.
+2025-11-01 23:37:36,678 - INFO - [5/5] Skipping offers. Feature comming soon.
+2025-11-01 23:37:36,678 - INFO - Retrieving final points...
+2025-11-01 23:37:36,686 - INFO - Points after: 11206
+2025-11-01 23:37:36,687 - INFO - Total points gained: 0
+2025-11-01 23:37:36,687 - INFO - Bot run complete.
+
+Points Gained: 0
+Points Before: 11206
+Points After: 11206
+2025-11-01 23:37:36,687 - INFO - Headless mode: Quitting driver.
+2025-11-01 23:37:36,816 - INFO - Bot run finished. Ready for next run.

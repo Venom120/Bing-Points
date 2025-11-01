@@ -5,7 +5,7 @@ import random
 import logging
 import threading
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, font
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -15,6 +15,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.edge.service import Service
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
+# Import the specific exception
+from selenium.common.exceptions import SessionNotCreatedException
 
 # --- Constants ---
 CONFIG_FILE = "config.json"
@@ -124,8 +126,8 @@ class BingPointsApp(tk.Tk):
         path_frame.columnconfigure(1, weight=1) # Allow the entry column to expand
 
         self.create_path_entry(path_frame, "Profile Path:", "profile_path", self.select_profile_path, 0)
-        self.create_path_entry(path_frame, "Driver Path (Optional):", "driver_path", self.select_driver_path, 1)
-        self.create_path_entry(path_frame, "Binary Path (Optional):", "binary_path", self.select_binary_path, 2)
+        self.create_path_entry(path_frame, "Driver Path:", "driver_path", self.select_driver_path, 1)
+        self.create_path_entry(path_frame, "Binary Path:", "binary_path", self.select_binary_path, 2)
 
         # --- Bot Settings ---
         settings_frame = ttk.LabelFrame(main_frame, text="Bot Settings", padding="10")
@@ -135,7 +137,19 @@ class BingPointsApp(tk.Tk):
         options_frame.pack(fill="x", expand=True) # Allow options_frame to expand
         ttk.Checkbutton(options_frame, text="Run Headless (in background)", variable=self.vars["headless"]).pack(side="left", padx=5)
         ttk.Checkbutton(options_frame, text="Perform Searches", variable=self.vars["do_searches"]).pack(side="left", padx=5)
-        ttk.Checkbutton(options_frame, text="Collect Offers", variable=self.vars["do_offers"]).pack(side="left", padx=5)
+        offers_checkbox = ttk.Checkbutton(options_frame, variable=self.vars["do_offers"])
+        offers_checkbox.state(["disabled"])
+        offers_checkbox.pack(side="left", padx=5)
+
+        # Mixed text
+        offers_L1 = ttk.Label(options_frame, text="Collect Offers")
+        offers_L1.state(["disabled"])
+        offers_L1.pack(side="left")
+        offers_L2 = ttk.Label(options_frame, text=" (Coming soon)", font=font.Font(size=8, slant="italic"))
+        offers_L2.state(["disabled"])
+        offers_L2.pack(side="left", anchor="w")
+
+        offers_checkbox.state(['disabled']) # Disable offers for now
         
         # Numeric settings
         numeric_frame = ttk.Frame(settings_frame)
@@ -279,9 +293,12 @@ class BingPointsApp(tk.Tk):
             self.log_status("[1/5] Setting up Edge driver...")
             self.driver = self.setup_driver()
             if not self.driver:
-                # setup_driver() will have already shown an error or prompted user
-                raise Exception("Failed to initialize WebDriver. Check logs and settings.")
-            
+                # setup_driver() will have already shown a specific error
+                # and logged it. We just need to stop this thread, which
+                # will trigger the 'finally' block for cleanup.
+                self.log_status("Driver setup failed. Halting bot run.")
+                return # Simply exit the function
+
             self.log_status("[2/5] Navigating to Bing.com...")
             self.driver.get("https://www.bing.com/")
             time.sleep(3) # Wait for page to load
@@ -303,24 +320,30 @@ class BingPointsApp(tk.Tk):
             else:
                 self.log_status("[4/5] Skipping searches.")
 
-            # --- 4. Collect Offers ---
-            if self.thread_config["do_offers"]:
-                self.log_status("[5/5] Collecting special offers...")
-                self.collect_special_offers(initial_tab)
-                self.driver.switch_to.window(initial_tab)
-                self.driver.get("https://www.bing.com/") # Refresh
-                time.sleep(3)
-            else:
-                self.log_status("[5/5] Skipping offers.")
+            # TODO fix the offer collect logic cause only clicking the offers works, href link doesnt work always.
+            # # --- 4. Collect Offers ---
+            # if self.thread_config["do_offers"]:
+            #     self.log_status("[5/5] Collecting special offers...")
+            #     self.collect_special_offers(initial_tab)
+            #     self.driver.switch_to.window(initial_tab)
+            #     self.driver.get("https://www.bing.com/") # Refresh
+            #     time.sleep(3)
+            # else:
+            self.log_status("[5/5] Skipping offers. Feature comming soon.")
 
             # --- 5. Get Final Points ---
             self.log_status("Retrieving final points...")
             points_after = self.get_current_points()
             self.log_status(f"Points after: {points_after}")
 
-            total_gained = points_after - points_before
-            self.log_status(f"Total points gained: {total_gained}")
-            self.show_info("Bot Finished", f"Bot run complete.\n\nPoints Gained: {total_gained}\nPoints Before: {points_before}\nPoints After: {points_after}")
+            # Handle case where points couldn't be read
+            if points_before == 0 and points_after == 0:
+                self.log_status("Could not read points before or after. Check UI manually.")
+                self.show_info("Bot Finished", "Bot run complete.\n\nCould not read point values. Please check Bing manually.")
+            else:
+                total_gained = points_after - points_before
+                self.log_status(f"Total points gained: {total_gained}")
+                self.show_info("Bot Finished", f"Bot run complete.\n\nPoints Gained: {total_gained}\nPoints Before: {points_before}\nPoints After: {points_after}")
 
         except Exception as e:
             self.show_error("Bot Error", f"An error occurred during bot operation:\n{e}")
@@ -372,13 +395,19 @@ class BingPointsApp(tk.Tk):
             
             # Use user-selected profile path
             if not cfg["profile_path"] or not os.path.exists(cfg["profile_path"]):
-                self.show_error("Profile Error", f"Profile path is invalid or not set:\n{cfg['profile_path']}")
-                return None
+                error_msg = f"Profile path is invalid or not set:\n{cfg['profile_path']}"
+                self.show_error("Profile Error", error_msg)
+                raise Exception(error_msg) # This will be caught by the outer catch
             edge_options.add_argument(f"--user-data-dir={cfg['profile_path']}") 
 
             # Use user-selected binary location (if provided)
             if cfg["binary_path"] and os.path.exists(cfg["binary_path"]):
                 edge_options.binary_location = cfg["binary_path"]
+            elif cfg["binary_path"] and not os.path.exists(cfg["binary_path"]):
+                # If path is given but invalid, it's an error
+                error_msg = f"Binary path is set but invalid (file not found):\n{cfg['binary_path']}"
+                self.show_error("Binary Path Error", error_msg)
+                raise Exception(error_msg)
             
             # Initialize the driver service
             service = None
@@ -393,17 +422,14 @@ class BingPointsApp(tk.Tk):
                 
                 user_driver_path = cfg.get("driver_path")
                 if not user_driver_path or not os.path.exists(user_driver_path):
-                    # webdriver-manager failed AND user path is bad.
                     self.log_status("User-defined driver path is also invalid. Prompting user.")
                     self.after(0, self._prompt_for_driver_path) # Schedule prompt on main thread
                     return None # Stop the current bot run
                 
-                # webdriver-manager failed, BUT user path is valid.
                 self.log_status(f"Using saved driver path: {user_driver_path}")
                 service = Service(executable_path=user_driver_path)
 
             if not service:
-                # This will be hit if the prompt was scheduled
                 self.log_status("Could not initialize driver service.")
                 return None
                 
@@ -413,10 +439,20 @@ class BingPointsApp(tk.Tk):
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
             return driver
+        
+        except SessionNotCreatedException as e:
+            error_str = str(e).lower()
+            if "cannot find msedge binary" in error_str:
+                error_msg = ("Microsoft Edge binary not found.\n\n"
+                            "Please ensure Microsoft Edge is installed correctly, "
+                            f"or manually provide the path to {'msedge.exe' if os.name=='nt' else 'msedge'} in the 'Binary Path' setting.")
+                self.show_error("Edge Binary Not Found", error_msg)
+            else:
+                self.show_error("Driver Session Error", f"Failed to create driver session:\n{e.msg}")
+            return None
             
-        # This outer try/except catches errors in setting options, paths, etc.
         except Exception as e:
-            self.show_error("Driver Setup Failed", f"A critical error occurred during driver setup:\n{e}")
+            self.show_error("Driver Setup Failed", f"Failed to initialize WebDriver: {e}")
             return None
 
     def get_current_points(self):
@@ -433,7 +469,14 @@ class BingPointsApp(tk.Tk):
             return int(points_str)
         except Exception as e:
             self.log_status(f"[WARN] Could not retrieve points: {e}. Defaulting to 0.")
-            return 0
+            # Try one more time with a broader selector
+            try:
+                points_element = self.driver.find_element(By.ID, "id_rc")
+                points_str = points_element.text.replace(',', '')
+                return int(points_str)
+            except Exception as e2:
+                self.log_status(f"[WARN] Second attempt to get points failed: {e2}. Defaulting to 0.")
+                return 0
 
     def get_trending_searches(self):
         """Extracts trending search titles from Google Trends."""

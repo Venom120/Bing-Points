@@ -3,7 +3,7 @@
     "driver_path": "/bin/msedgedriver",
     "binary_path": "/bin/microsoft-edge-stable",
     "headless": true,
-    "num_searches": 1,
+    "num_searches": 10,
     "timeout": 10,
     "do_searches": false,
     "do_offers": false
