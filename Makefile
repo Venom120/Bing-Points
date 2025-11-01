@@ -1,19 +1,22 @@
 .PHONY: run install uninstall
 
 run:
-	@echo off
 	python -m venv .venv
 	source .venv/bin/activate && pip install -r req.txt
-	@echo on
-	python main.py
+	source .venv/bin/activate && python main.py
 
 install:
-	python -m venv .venv
-	source .venv/bin/activate && pip install -r req.txt
+	rm -rf /usr/share/bing_points
 	mkdir /usr/share/bing_points
-	cp ./* /usr/share/bing_points/
-	cp ./bing_points.desktop /usr/share/applications/bing_points.desktop
-	sed -i "s|^cd current_directory|cd $(shell pwd)|g" /usr/share/bing_points/bing_points.sh
+	
+	cp main.py req.txt bing_points.sh bing_points.desktop /usr/share/bing_points/
+	
+	cd /usr/share/bing_points && python -m venv .venv
+	cd /usr/share/bing_points && source .venv/bin/activate && pip install -r req.txt
+	
+	sed -i "s|cd current_directory|cd /usr/share/bing_points|g" /usr/share/bing_points/bing_points.sh
+	
+	cp /usr/share/bing_points/bing_points.desktop /usr/share/applications/bing_points.desktop
 	echo "Installation complete."
 
 uninstall:

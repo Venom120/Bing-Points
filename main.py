@@ -188,8 +188,6 @@ class BingPointsApp(tk.Tk):
         entry.grid(row=row, column=1, sticky="ew", padx=5)
         ttk.Button(parent, text="Browse", command=browse_command).grid(row=row, column=2, sticky="e", padx=5)
         parent.columnconfigure(1, weight=1) # Ensure the entry column expands
-        ttk.Button(parent, text="Browse", command=browse_command).grid(row=row, column=2, sticky="e", padx=5)
-        parent.columnconfigure(1, weight=1)
 
     def get_default_user_data_dir(self):
         """Gets the default Edge user data directory for the OS."""
