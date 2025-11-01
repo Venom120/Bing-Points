@@ -15,7 +15,7 @@ import tkinter as tk
 
 CONFIG_FILE = "config.json"
 NUMBER_OF_SEARCHES=10
-HEADLESS=False
+HEADLESS=True
 
 """!!!!!!!!!!!!!!!! Change these acccording to your system !!!!!!!!!!!!!!!!"""
 your_username = getpass.getuser()
@@ -28,7 +28,7 @@ if os.name == 'nt': # Windows
         raise EnvironmentError("APPDATA environment variable is not set. Please check your system configuration.")
     user_data_dir = os.path.join(appdata, "Local", "Microsoft", "Edge", "User Data", profile_name)  # Replace with your actual profile path
 else: # Linux
-    user_data_dir = f"/home/{your_username}/.config/microsoft-edge/Default"  # Replace with your actual profile path
+    user_data_dir = f"/home/{your_username}/.config/microsoft-edge/{profile_name}"  # Replace with your actual profile path
 
 # Specify Edge exec/binary location
 if os.name == 'nt': # Windows
@@ -300,21 +300,19 @@ def collect_special_offers(driver):
 choice_yes = re.compile(r"^(yes|y)$", re.IGNORECASE)
 choice_no = re.compile(r"^(no|n)$", re.IGNORECASE)
 
-if choice_yes.match(input("\nWant to run the browser in background? (yes/no): ")):
-    HEADLESS=True
+if choice_no.match(input("\nWant to run the browser in background? (yes/no): ")):
+    HEADLESS=False
 
-while True:
-    choice_search = input("\nDo you want to collect points from trending searches? (yes/no): ").lower()
-    if choice_yes.match(choice_search):
-        count = int(input("\nHow many searches? (default=10): "))
-        if count:
-            NUMBER_OF_SEARCHES=count
-            print(f"[INFO] Will search {NUMBER_OF_SEARCHES} trends on bing!!")
-        break
-    elif choice_no.match(choice_search):
-        break
-    else:
-        print("Invalid input. Please enter 'yes' or 'no'.")
+choice_search = input("\nDo you want to collect points from trending searches? (yes/no): ").lower()
+if choice_search == "":
+    choice_search = "yes"
+if choice_no.match(choice_search):
+    pass
+else:
+    count = input("\nHow many searches? (default=10): ")
+    if len(count) > 0:
+        NUMBER_OF_SEARCHES=int(count)
+    print(f"[INFO] Will search {NUMBER_OF_SEARCHES} trends on bing!!")
 
 while True:
     choice_offers = input("\nDo you want to collect points from special offers? (yes/no): ").lower()
