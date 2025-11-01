@@ -1,3 +1,10 @@
 {
-    "driver_path": "/bin/msedgedriver"
+    "profile_path": "/home/yatharth/.config/microsoft-edge/Default",
+    "driver_path": "/bin/msedgedriver",
+    "binary_path": "/bin/microsoft-edge-stable",
+    "headless": true,
+    "num_searches": 1,
+    "timeout": 10,
+    "do_searches": false,
+    "do_offers": false
 }
