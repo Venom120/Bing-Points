@@ -29,7 +29,7 @@ For Arch Linux and its derivatives (like Manjaro), you can install the `bing_poi
 * An AUR helper (e.g., `yay`, `paru`). If you don't have one, you can install `yay` with:
     ```bash
     sudo pacman -Sy --needed git base-devel
-    git clone [https://aur.archlinux.org/yay.git](https://aur.archlinux.org/yay.git)
+    git clone https://aur.archlinux.org/yay.git
     cd yay
     makepkg -si
     ```
@@ -64,7 +64,7 @@ This command will:
 2.  **Clone the Repository and Install:**
 
     ```bash
-    git clone [https://github.com/Venom120/Bing-Points.git](https://github.com/Venom120/Bing-Points.git)
+    git clone https://github.com/Venom120/Bing-Points.git
     cd Bing-Points
     sudo make install
     ```
@@ -87,7 +87,7 @@ This command will:
 
       * Download the project ZIP file from the GitHub repository and extract it, or clone the repository using Git:
         ```bash
-        git clone [https://github.com/Venom120/Bing-Points.git](https://github.com/Venom120/Bing-Points.git)
+        git clone https://github.com/Venom120/Bing-Points.git
         cd Bing-Points
         ```
 
