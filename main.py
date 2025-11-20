@@ -6,6 +6,7 @@ import logging
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, font
+from typing import Literal
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -184,23 +185,31 @@ class BingPointsApp(tk.Tk):
 		# --- Info Note ---
 		info_label = ttk.Label(main_frame,
 							   text="Important: Ensure you are logged into your Microsoft account in the Edge profile you select.",
-							   font=("TkDefaultFont", 9, "italic")) # Removed wraplength
+							   font=("TkDefaultFont", 9, "italic"),
+							   wraplength=650,
+							   foreground="red")
 		info_label.grid(row=2, column=0, sticky="ew", pady=(5, 10)) # Use grid for info_label
 
 		# --- Controls ---
 		control_frame = ttk.Frame(main_frame)
 		control_frame.grid(row=3, column=0, sticky="ew", pady=5) # Use grid for control_frame
 		control_frame.columnconfigure(0, weight=1) # Allow space between buttons to expand
+		# Ensure we have columns for spacing and buttons
+		control_frame.grid_columnconfigure(1, weight=0)
+		control_frame.grid_columnconfigure(2, weight=0)
 		
-		self.run_button = ttk.Button(control_frame, text="Run Bot", command=self.start_bot_thread)
-		self.run_button.pack(side="right", padx=5)
-		
-		# Cancel button shown only while a run is active
-		self.cancel_button = ttk.Button(control_frame, text="Cancel", command=self.cancel_bot)
-		# Do not pack the cancel button now; it will be packed when needed
-
+		# Save button (left of the action buttons)
 		self.save_button = ttk.Button(control_frame, text="Save Settings", command=self.save_config)
-		self.save_button.pack(side="right", padx=5)
+		self.save_button.grid(row=0, column=1, sticky="e", padx=5)
+
+		# Run button (right-most by design)
+		self.run_button = ttk.Button(control_frame, text="Run Bot", command=self.start_bot_thread)
+		self.run_button.grid(row=0, column=2, sticky="e", padx=5)
+		
+		# Cancel button shown only while a run is active (start hidden)
+		self.cancel_button = ttk.Button(control_frame, text="Cancel", command=self.cancel_bot)
+		self.cancel_button.grid(row=0, column=2, sticky="e", padx=5)
+		self.cancel_button.grid_remove()  # hidden until a run starts
 
 		# --- Status Bar ---
 		status_bar = ttk.Frame(self, relief="sunken", padding=(5, 2))
@@ -259,16 +268,23 @@ class BingPointsApp(tk.Tk):
 			logging.info(f"User selected binary path: {path}")
 
 	# --- UI Status & Error Helpers ---
-	def log_status(self, message):
+	def log_status(self, message, lvl: Literal["info", "warn", "debug", "error"]="info"):
 		"""Updates status bar and logs to file."""
 		self.vars["status"].set(message)
-		logging.info(message)
+		if lvl == "warn":
+			logging.warning(message)
+		elif lvl == "debug":
+			logging.debug(message)
+		elif lvl == "error":
+			logging.error(message)
+		else:
+			logging.info(message)
 
 	def show_error(self, title, message):
 		"""Logs error and shows a Tkinter error messagebox."""
 		logging.error(message)
 		# Ensure messagebox runs on the main UI thread
-		self.after(0, lambda: messagebox.showerror(title, message))
+		self.after(0, lambda: messagebox.showerror(title, message, icon='error'))
 
 	def show_info(self, title, message):
 		"""Logs info and shows a Tkinter info messagebox."""
@@ -294,7 +310,12 @@ class BingPointsApp(tk.Tk):
 		"""
 		# Hide cancel button (if shown) and restore run button
 		try:
-			self.cancel_button.pack_forget()
+			self.cancel_button.grid_remove()
+		except Exception:
+			pass
+		# Re-show the run button in the right-most column and enable buttons
+		try:
+			self.run_button.grid()
 		except Exception:
 			pass
 		self.run_button.config(state="normal")
@@ -305,8 +326,16 @@ class BingPointsApp(tk.Tk):
 	def start_bot_thread(self):
 		"""Starts the main bot logic in a separate thread to keep UI responsive."""
 		# Prepare UI
-		self.run_button.pack_forget()  # hide run button
-		self.cancel_button.pack(side="right", padx=5)  # show cancel button
+		# Hide run button and show cancel button in its place
+		try:
+			self.run_button.grid_remove()
+		except Exception:
+			pass
+		try:
+			self.cancel_button.grid()  # show cancel button in the same column (right-most)
+		except Exception:
+			pass
+
 		self.save_button.config(state="disabled")
 		self.log_status("Starting bot...")
 		
@@ -346,12 +375,8 @@ class BingPointsApp(tk.Tk):
 				self.log_status("Run cancelled before navigation.")
 				return
 
-			self.log_status("[2/5] Navigating to Bing.com...")
-			self.driver.get("https://www.bing.com/")
-			time.sleep(3) # Wait for page to load
-
 			# --- 2. Get Initial Points ---
-			self.log_status("[3/5] Retrieving initial points...")
+			self.log_status("[2/4] Retrieving initial points...")
 			points_before = self.get_current_points()
 			self.log_status(f"Points before: {points_before}")
 			
@@ -359,24 +384,24 @@ class BingPointsApp(tk.Tk):
 
 			# --- 3. Perform Searches ---
 			if self.thread_config["do_searches"]:
-				self.log_status("[4/5] Performing trending searches...")
+				self.log_status("[3/4] Performing trending searches...")
 				self.perform_trending_searches(initial_tab)
 				self.driver.switch_to.window(initial_tab)
 				self.driver.get("https://www.bing.com/") # Refresh
 				time.sleep(3)
 			else:
-				self.log_status("[4/5] Skipping searches.")
+				self.log_status("[3/4] Skipping searches.")
 
 			# TODO fix the offer collect logic cause only clicking the offers works, href link doesnt work always.
 			# # --- 4. Collect Offers ---
 			# if self.thread_config["do_offers"]:
-			#     self.log_status("[5/5] Collecting special offers...")
+			#     self.log_status("[4/4] Collecting special offers...")
 			#     self.collect_special_offers(initial_tab)
 			#     self.driver.switch_to.window(initial_tab)
 			#     self.driver.get("https://www.bing.com/") # Refresh
 			#     time.sleep(3)
 			# else:
-			self.log_status("[5/5] Skipping offers. Feature comming soon.")
+			self.log_status("[4/4] Skipping offers. Feature comming soon.")
 
 			# --- 5. Get Final Points ---
 			self.log_status("Retrieving final points...")
@@ -505,30 +530,34 @@ class BingPointsApp(tk.Tk):
 	def get_current_points(self):
 		"""Retrieves the current point balance from the Bing page."""
 		if not self.driver:
-			self.log_status("[WARN] Driver not available. Cannot get points.")
+			self.log_status("Driver not available. Cannot get points.", "warn")
 			return 0
 
 		try:
+			self.driver.get("https://www.bing.com/rewards/panelflyout")
 			points_element = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
-				EC.presence_of_element_located((By.XPATH, '//*[@id="rh_rwm"]/div/span[1]'))
+				EC.presence_of_element_located((By.XPATH, '//*[@id="bingRewards"]/div/div[1]/div[1]/div/div[1]/span'))
 			)
 			points_str = points_element.text.replace(',', '')
 			return int(points_str)
 		except Exception as e:
-			self.log_status(f"[WARN] Could not retrieve points: {e}. Defaulting to 0.")
+			self.log_status(f"Could not retrieve points. Defaulting to 0. {e}", "warn")
 			# Try one more time with a broader selector
 			try:
 				points_element = self.driver.find_element(By.ID, "id_rc")
 				points_str = points_element.text.replace(',', '')
 				return int(points_str)
 			except Exception as e2:
-				self.log_status(f"[WARN] Second attempt to get points failed: {e2}. Defaulting to 0.")
+				self.log_status(f"Second attempt to get points failed: {e2}. Defaulting to 0.", "warn")
 				return 0
+		finally:
+			self.driver.switch_to.default_content()
+
 
 	def get_trending_searches(self):
 		"""Extracts trending search titles from Google Trends."""
 		if not self.driver:
-			self.log_status("[WARN] Driver not available. Cannot get trends.")
+			self.log_status("Driver not available. Cannot get trends.", "warn")
 			return [] # Return empty list
 
 		self.log_status("Getting trending searches from Google...")
@@ -570,16 +599,16 @@ class BingPointsApp(tk.Tk):
 						trending_searches.append(term)
 						self.log_status(f"Extracted trend: {term}")
 				except Exception as e_row:
-					self.log_status(f"[WARN] Could not extract a search title: {e_row}")
+					self.log_status(f"Could not extract a search title: {e_row}", "warn")
 			
 			if trending_searches:
 				return trending_searches
 
 		except Exception as e:
-			self.log_status(f"[WARN] Error extracting trending searches: {e}")
+			self.log_status(f"Error extracting trending searches: {e}", "warn")
 		
 		# Fallback list
-		self.log_status("[WARN] Using fallback search list.")
+		self.log_status("Using fallback search list.", "warn")
 		return [
 			"news", "weather", "sports", "technology", "entertainment",
 			"health", "science", "finance", "travel", "food",
@@ -590,7 +619,7 @@ class BingPointsApp(tk.Tk):
 	def perform_trending_searches(self, initial_tab):
 		"""Performs Bing searches based on trending topics."""
 		if not self.driver:
-			self.log_status("[WARN] Driver not available. Skipping searches.")
+			self.log_status("Driver not available. Skipping searches.", "warn")
 			return
 
 		trending_searches = self.get_trending_searches()
@@ -622,7 +651,7 @@ class BingPointsApp(tk.Tk):
 				time.sleep(random.uniform(3, 5))
 
 			except Exception as e:
-				self.log_status(f"[WARN] Error during search for '{search_term}': {e}")
+				self.log_status(f"Error during search for '{search_term}': {e}", "warn")
 			
 			finally:
 				# Close current tab and switch back
@@ -634,7 +663,7 @@ class BingPointsApp(tk.Tk):
 	def find_offers(self):
 		"""Finds clickable offer elements in the rewards iframe."""
 		if not self.driver:
-			self.log_status("[WARN] Driver not available. Cannot find offers.")
+			self.log_status("Driver not available. Cannot find offers.", "warn")
 			return []
 
 		offers = []
@@ -656,7 +685,7 @@ class BingPointsApp(tk.Tk):
 						a_tag = div.find_element(By.TAG_NAME, 'a')
 						offers.append((a_tag, aria_label.split("-")[0].strip()))
 				except Exception as e_offer:
-					self.log_status(f"[WARN] Error parsing one offer: {e_offer}")
+					self.log_status(f"Error parsing one offer: {e_offer}", "warn")
 			
 			self.log_status(f"Found {len(offers)} offers.")
 		except Exception as e_find:
@@ -666,7 +695,7 @@ class BingPointsApp(tk.Tk):
 	def collect_special_offers(self, initial_tab):
 		"""Clicks through all available special offers."""
 		if not self.driver:
-			self.log_status("[WARN] Driver not available. Skipping offers.")
+			self.log_status("Driver not available. Skipping offers.", "warn")
 			return
 
 		self.log_status("Checking for special offers...")
@@ -699,9 +728,9 @@ class BingPointsApp(tk.Tk):
 						new_tab_handles.append(new_handles[0])
 						self.log_status(f"Opened new tab for offer {i+1}.")
 					else:
-						self.log_status(f"[WARN] No new tab found for offer {i+1}.")
+						self.log_status(f"No new tab found for offer {i+1}.", "warn")
 				except Exception as e_click:
-					self.log_status(f"[WARN] Error clicking offer {i+1} ({offer_name}): {e_click}")
+					self.log_status(f"Error clicking offer {i+1} ({offer_name}): {e_click}", "warn")
 			
 			# Switch back from iframe
 			self.driver.switch_to.default_content()
@@ -716,7 +745,7 @@ class BingPointsApp(tk.Tk):
 					self.driver.close()
 					self.log_status(f"Closed tab for offer {i+1}.")
 				except Exception as e_tab:
-					self.log_status(f"[WARN] Error processing tab for offer {i+1}: {e_tab}")
+					self.log_status(f"Error processing tab for offer {i+1}: {e_tab}", "warn")
 				finally:
 					self.driver.switch_to.window(initial_tab) # Ensure we're back
 
