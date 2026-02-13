@@ -1,3 +1,4 @@
+from cProfile import label
 import os
 import json
 import time
@@ -8,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, font
 from typing import Literal
 
+import pyperclip
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -17,7 +19,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.edge.service import Service
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 # Import the specific exception
-from selenium.common.exceptions import SessionNotCreatedException
+from selenium.common.exceptions import SessionNotCreatedException, StaleElementReferenceException
 
 # --- Constants ---
 CONFIG_FILE = "config.json"
@@ -32,7 +34,8 @@ DEFAULT_CONFIG = {
 	"num_searches": 10,
 	"timeout": 10,
 	"do_searches": True,
-	"do_offers": False
+	"do_offers": False,
+	"do_leetcode": False
 }
 
 # --- Logging Setup ---
@@ -94,6 +97,7 @@ class BingPointsApp(tk.Tk):
 			"timeout": tk.IntVar(value=self.config.get("timeout")),
 			"do_searches": tk.BooleanVar(value=self.config.get("do_searches")),
 			"do_offers": tk.BooleanVar(value=self.config.get("do_offers")),
+			"do_leetcode": tk.BooleanVar(value=self.config.get("do_leetcode")),
 			"status": tk.StringVar(value="Ready. Fill settings and click Run.")
 		}
 		
@@ -160,19 +164,24 @@ class BingPointsApp(tk.Tk):
 		options_frame.pack(fill="x", expand=True) # Allow options_frame to expand
 		ttk.Checkbutton(options_frame, text="Run Headless (in background)", variable=self.vars["headless"]).pack(side="left", padx=5)
 		ttk.Checkbutton(options_frame, text="Perform Searches", variable=self.vars["do_searches"]).pack(side="left", padx=5)
+
+		# Collect Offers option
 		offers_checkbox = ttk.Checkbutton(options_frame, variable=self.vars["do_offers"])
 		offers_checkbox.state(["disabled"])
 		offers_checkbox.pack(side="left", padx=5)
-
-		# Mixed text
+		# Mixed text for special offers with disabled state and "coming soon" note
 		offers_L1 = ttk.Label(options_frame, text="Collect Offers")
 		offers_L1.state(["disabled"])
 		offers_L1.pack(side="left")
+		offers_checkbox.state(['disabled']) # Disable offers for now
+
 		offers_L2 = ttk.Label(options_frame, text=" (Coming soon)", font=font.Font(size=8, slant="italic"))
 		offers_L2.state(["disabled"])
 		offers_L2.pack(side="left", anchor="w")
 
-		offers_checkbox.state(['disabled']) # Disable offers for now
+		# Leetcode Bot option
+		ttk.Checkbutton(options_frame, text="Leetcode Bot", variable=self.vars["do_leetcode"]).pack(side="left", padx=5)
+
 		
 		# Numeric settings
 		numeric_frame = ttk.Frame(settings_frame)
@@ -291,6 +300,24 @@ class BingPointsApp(tk.Tk):
 		logging.info(message)
 		self.after(0, lambda: messagebox.showinfo(title, message))
 
+	def prompt_close_driver(self):
+		"""Ask the user whether to close the active driver."""
+		if not self.driver:
+			return
+		def _ask():
+			try:
+				should_close = messagebox.askyesno(
+					"Close Browser?",
+					"Leetcode completed successfully. Close the browser now?"
+				)
+				if should_close and self.driver:
+					self.driver.quit()
+					self.driver = None
+					self.log_status("Browser closed after Leetcode completion.")
+			except Exception as e:
+				logging.debug(f"Error while prompting to close driver: {e}")
+		self.after(0, _ask)
+
 	def _prompt_for_driver_path(self):
 		"""
 		Shows an error and opens the file dialog to select the driver path.
@@ -376,51 +403,75 @@ class BingPointsApp(tk.Tk):
 				return
 
 			# --- 2. Get Initial Points ---
-			self.log_status("[2/4] Retrieving initial points...")
-			points_before = self.get_current_points()
-			self.log_status(f"Points before: {points_before}")
-			
-			initial_tab = self.driver.current_window_handle
+			if self.thread_config["do_searches"] or self.thread_config["do_offers"]:
+				self.log_status("[2/4] Retrieving initial points...")
+				points_before = self.get_current_points()
+				self.log_status(f"Points before: {points_before}")
+				
+				initial_tab = self.driver.current_window_handle
 
-			# --- 3. Perform Searches ---
-			if self.thread_config["do_searches"]:
-				self.log_status("[3/4] Performing trending searches...")
-				self.perform_trending_searches(initial_tab)
-				self.driver.switch_to.window(initial_tab)
-				self.driver.get("https://www.bing.com/") # Refresh
-				time.sleep(3)
-			else:
-				self.log_status("[3/4] Skipping searches.")
+				# --- 3. Perform Searches ---
+				if self.thread_config["do_searches"]:
+					self.log_status("[3/4] Performing trending searches...")
+					self.perform_trending_searches(initial_tab)
+					self.driver.switch_to.window(initial_tab)
+					self.driver.get("https://www.bing.com/") # Refresh
+					time.sleep(3)
+				else:
+					self.log_status("[3/4] Skipping searches.")
 
-			# TODO fix the offer collect logic cause only clicking the offers works, href link doesnt work always.
-			# # --- 4. Collect Offers ---
-			# if self.thread_config["do_offers"]:
-			#     self.log_status("[4/4] Collecting special offers...")
-			#     self.collect_special_offers(initial_tab)
-			#     self.driver.switch_to.window(initial_tab)
-			#     self.driver.get("https://www.bing.com/") # Refresh
-			#     time.sleep(3)
-			# else:
-			self.log_status("[4/4] Skipping offers. Feature comming soon.")
+				# --- 4. Collect Offers ---
+				if self.thread_config["do_offers"]:
+					self.log_status("[4/4] Collecting special offers...")
+					self.collect_special_offers(initial_tab)
+					self.driver.switch_to.window(initial_tab)
+					self.driver.get("https://www.bing.com/") # Refresh
+					time.sleep(3)
+				else:
+					self.log_status("[4/4] Skipping offers. Feature coming soon.")
 
-			# --- 5. Get Final Points ---
-			self.log_status("Retrieving final points...")
-			points_after = self.get_current_points()
-			self.log_status(f"Points after: {points_after}")
+				# --- 5. Get Final Points ---
+				self.log_status("Retrieving final points...")
+				points_after = self.get_current_points()
+				self.log_status(f"Points after: {points_after}")
 
-			# Handle case where points couldn't be read
-			if points_before == 0 and points_after == 0:
-				self.log_status("Could not read points before or after. Check UI manually.")
-				self.show_info("Bot Finished", "Bot run complete.\n\nCould not read point values. Please check Bing manually.")
-			else:
-				total_gained = points_after - points_before
-				self.log_status(f"Total points gained: {total_gained}")
-				self.show_info("Bot Finished", f"Bot run complete.\n\nPoints Gained: {total_gained}\nPoints Before: {points_before}\nPoints After: {points_after}")
+				# Handle case where points couldn't be read
+				if points_before == 0 and points_after == 0:
+					self.log_status("Could not read points before or after. Check UI manually.")
+					self.show_info("Bing Bot Finished", "Bot run complete.\n\nCould not read point values. Please check Bing manually.")
+				else:
+					total_gained = points_after - points_before
+					self.log_status(f"Total points gained: {total_gained}")
+					self.show_info("Bing Bot Finished", f"Bot run complete.\n\nPoints Gained: {total_gained}\nPoints Before: {points_before}\nPoints After: {points_after}")
 
+			# --- 6. Leetcode Bot ---
+			if self.thread_config["do_leetcode"]:
+				self.log_status("Preparing Leetcode bot...")
+				if self.thread_config["headless"]:
+					self.log_status("Leetcode requires non-headless mode. Restarting driver...")
+					try:
+						if self.driver:
+							self.driver.quit()
+					except Exception as e_close:
+						logging.debug(f"Error while closing driver before Leetcode: {e_close}")
+
+					self.driver = None
+					self.thread_config["headless"] = False
+					self.driver = self.setup_driver()
+					if not self.driver:
+						self.log_status("Driver restart failed. Skipping Leetcode bot.")
+						return
+				else:
+					self.log_status("Non-headless mode already enabled. Continuing with current driver.")
+
+				self.log_status("Running Leetcode bot...")
+				self.run_leetcode_bot()
+				self.log_status("Leetcode bot finished.")
+				
 		except Exception as e:
-			self.show_error("Bot Error", f"An error occurred during bot operation:\n{e}")
+			self.show_error("Bing Bot Error", f"An error occurred during bot operation:\n{e}")
 		finally:
-			# --- 6. Cleanup ---
+			# --- 7. Cleanup ---
 			if self.driver:
 				if self.thread_config["headless"]:
 					self.log_status("Headless mode: Quitting driver.")
@@ -461,7 +512,11 @@ class BingPointsApp(tk.Tk):
 			edge_options.add_argument("--disable-extensions")
 			edge_options.add_experimental_option("excludeSwitches", ["enable-automation"])
 			edge_options.add_experimental_option("useAutomationExtension", False)
-			edge_options.add_experimental_option("detach", not cfg["headless"]) # Keep open if not headless
+			# Keep browser open for non-headless runs, except during Leetcode where users may opt to close it.
+			edge_options.add_experimental_option(
+				"detach",
+				not cfg["headless"] and not cfg.get("do_leetcode", False)
+			)
 			
 			edge_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) edge/119.0.0.0 Safari/537.36")
 			
@@ -661,7 +716,7 @@ class BingPointsApp(tk.Tk):
 				time.sleep(0.5)
 
 	def find_offers(self):
-		"""Finds clickable offer elements in the rewards iframe."""
+		"""Finds clickable offer elements in the offers flyout."""
 		if not self.driver:
 			self.log_status("Driver not available. Cannot find offers.", "warn")
 			return []
@@ -694,73 +749,435 @@ class BingPointsApp(tk.Tk):
 
 	def collect_special_offers(self, initial_tab):
 		"""Clicks through all available special offers."""
+		return
 		if not self.driver:
 			self.log_status("Driver not available. Skipping offers.", "warn")
 			return
 
 		self.log_status("Checking for special offers...")
 		try:
-			# Open sidebar
-			sidebar_button = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
-				EC.presence_of_element_located((By.XPATH, '//*[@id="rh_rwm"]/div/div'))
-			)
-			sidebar_button.click()
-			time.sleep(2)
-
-			# Switch to iframe
-			iframe_element = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
-				EC.presence_of_element_located((By.XPATH, '//*[@id="rewid-f"]/iframe'))
-			)
-			self.driver.switch_to.frame(iframe_element)
-			
+			# Get the list of all href from the child divs and their aria-labels to determine which are offers not collected yet
 			offers = self.find_offers()
-			new_tab_handles = []
-
-			for i, (offer_element, offer_name) in enumerate(offers):
-				self.log_status(f"Clicking offer {i+1}/{len(offers)}: {offer_name}")
-				try:
-					original_handles = self.driver.window_handles
-					offer_element.click()
-					time.sleep(2)
-					
-					new_handles = [h for h in self.driver.window_handles if h not in original_handles]
-					if new_handles:
-						new_tab_handles.append(new_handles[0])
-						self.log_status(f"Opened new tab for offer {i+1}.")
-					else:
-						self.log_status(f"No new tab found for offer {i+1}.", "warn")
-				except Exception as e_click:
-					self.log_status(f"Error clicking offer {i+1} ({offer_name}): {e_click}", "warn")
 			
-			# Switch back from iframe
-			self.driver.switch_to.default_content()
-			time.sleep(1.25)
-			
-			# Process new tabs
-			for i, handle in enumerate(new_tab_handles):
-				try:
-					self.driver.switch_to.window(handle)
-					self.log_status(f"Switched to tab for offer {i+1}.")
-					time.sleep(random.uniform(3, 5))
-					self.driver.close()
-					self.log_status(f"Closed tab for offer {i+1}.")
-				except Exception as e_tab:
-					self.log_status(f"Error processing tab for offer {i+1}: {e_tab}", "warn")
-				finally:
-					self.driver.switch_to.window(initial_tab) # Ensure we're back
 
-		except Exception as e_sidebar:
-			self.show_error("Offer Error", f"Could not process special offers: {e_sidebar}")
+
+		except Exception as e:
+			self.log_status(f"Error during offer collection -> {e}", "warn")
+
 		finally:
-			# Always ensure we switch back to default content and initial tab
-			try:
-				self.driver.switch_to.default_content()
-			except: pass
-			try:
-				self.driver.switch_to.window(initial_tab)
-			except: pass
-		
+			# Close current tab and switch back
+			if len(self.driver.window_handles) > 1:
+				self.driver.close()
+			self.driver.switch_to.window(initial_tab)
+			time.sleep(0.5)
+			
 		self.log_status("Finished processing offers.")
+
+	def check_leetcode_login_status(self): # check leetcode login status by looking for the `navbar_user_avatar` id anywhere on the headers
+		"""Checks if the user is logged into Leetcode by looking for the avatar element."""
+		if not self.driver:
+			self.log_status("Driver not available. Cannot check login status.", "warn")
+			return False
+
+		try:
+			locators = [
+				(By.ID, "navbar_user_avatar"),
+				(By.CSS_SELECTOR, "img[alt*='avatar' i]"),
+				(By.CSS_SELECTOR, "[data-cy='navbar-avatar']"),
+				(By.XPATH, "//img[contains(@alt, 'Avatar') or contains(@alt, 'avatar')]")
+			]
+			avatar = self.wait_for_any(locators, self.thread_config["timeout"], "login avatar")
+			return avatar is not None
+		except Exception:
+			return False
+
+	def log_browser_state(self, context):
+		"""Logs current URL and title for diagnostics."""
+		if not self.driver:
+			return
+		try:
+			self.log_status(f"{context} | url={self.driver.current_url} | title={self.driver.title}")
+		except Exception as e:
+			logging.debug(f"Could not read browser state: {e}")
+
+	def wait_for_any(self, locators, timeout, label, clickable=False):
+		"""Waits for the first matching locator and returns the element."""
+		if not self.driver:
+			return None
+		last_exc = None
+		for by, value in locators:
+			try:
+				if clickable:
+					return WebDriverWait(self.driver, timeout).until(
+						EC.element_to_be_clickable((by, value))
+					)
+				return WebDriverWait(self.driver, timeout).until(
+					EC.presence_of_element_located((by, value))
+				)
+			except Exception as e:
+				last_exc = e
+				continue
+		self.log_status(f"Leetcode step failed: {label}. Last error: {last_exc}", "warn")
+		self.log_browser_state(f"Leetcode failure: {label}")
+		return None
+	
+	def select_python_in_editor(self):
+		"""Selects Python3 as the language in the Leetcode editor."""
+		if not self.driver:
+			self.log_status("Driver not available. Cannot select editor language.", "warn")
+			return
+		try:
+			locators = [
+				(By.XPATH, '//*[@id="editor"]/div[1]/div[1]/div[1]/button'),
+				(By.CSS_SELECTOR, "button[aria-controls='radix-:r21:']")
+			]
+			language_dropdown = self.wait_for_any(locators, self.thread_config["timeout"], "editor language dropdown", clickable=True)
+			if not language_dropdown:
+				self.log_status("Editor language dropdown not found.", "warn")
+				return False
+			
+			current_label = language_dropdown.find_element(By.XPATH, "./..").text.strip().lower()
+			if current_label == "python3" or current_label == "python 3":
+				self.log_status("Editor already set to Python3.")
+				return True
+			
+			language_dropdown.click()
+			time.sleep(1) # wait for dropdown to open
+			
+
+			python_locators = [
+				(By.XPATH, "/html/body/div[7]/div/div/div[1]"),
+				(By.XPATH, "//*[@id='radix-:r21:']/div/div[1]")
+			]
+			python_option = self.wait_for_any(python_locators, self.thread_config["timeout"], "python3 language select", clickable=True)
+			if python_option:
+				self.log_status("Selecting Python3 in editor language dropdown...")
+				python_option.click()
+				time.sleep(1) # wait for editor to switch
+				self.log_status("Switched editor language to Python3.")
+				return True
+			else:
+				self.log_status("Python3 option not found in editor language dropdown.", "warn")
+				return False
+		except Exception as e:
+			self.log_status(f"Error switching editor language: {e}", "warn")
+			return False
+
+	def get_solution_from_solutions(self):
+		"""Attempts to extract a Python3 solution from the user solutions."""
+		if not self.driver:
+			self.log_status("Driver not available. Cannot get solutions.", "warn")
+			return None
+
+		self.log_status("Attempting to retrieve Python3 solution from solutions...")
+		try:
+			if self.cancel_event.is_set():
+				return None
+			# Navigate to the solutions tab
+			solutions_tab = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+				EC.element_to_be_clickable((By.XPATH, '//*[@id="description_tabbar_outer"]/div[1]/div/div[5]'))
+			)
+			solutions_tab.click()
+			
+			# wait for filters to load
+			initial_filter_tab = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+				EC.presence_of_element_located((By.XPATH, '//span[contains(text(), "My Solution")]')) # a span which contains text "My Solution"
+			)
+
+			# Find Python3 filter and click it
+			python_filter = None
+			filters = initial_filter_tab.find_elements(By.XPATH, '../div[1]/span') # filter options
+			for f in filters:
+				if f.text.strip().lower() == "python3":
+					python_filter = f
+					break
+			if python_filter:
+				python_filter.click()
+				self.log_status("Applied Python3 filter to solutions.")
+				time.sleep(1)
+			else:
+				self.log_status("Python3 filter not found in solutions. Continuing without filter.", "warn")
+
+			# Wait for solution list container to appear
+			flyout_container = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+				EC.presence_of_element_located((By.XPATH, '/html/body/div[1]/div[2]/div/div/div[4]/div/div/div[6]'))
+			) # wait for solution flyout to load
+
+			WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+				EC.presence_of_element_located((By.XPATH, "(.//*[contains(@class,'group/ads')])")) # Wait for ad element to load which ensures that most solutions are loaded
+			)
+			solution_posts = flyout_container.find_elements(By.XPATH, './div/div/div[3]/div[3]/div[1]/div') # get all solution posts
+			self.log_status(f"Found {len(solution_posts)} solution posts.")
+			post_count = len(solution_posts)
+			for idx in range(1, post_count): # skip the first one since it's usually pinned
+				try:
+					fresh_posts = flyout_container.find_elements(By.XPATH, './div/div/div[3]/div[3]/div[1]/div')
+					if idx >= len(fresh_posts):
+						break
+					post = fresh_posts[idx]
+					post_title = post.find_element(By.XPATH, './div[1]/div/div[2]/div[2]/div/a')
+					post_title.click()
+					self.log_status("Opened a solution post.")
+					solution_flyout = WebDriverWait(flyout_container, self.thread_config["timeout"]).until(
+						EC.presence_of_element_located((By.XPATH, './div[2]'))
+					) # wait for solution to load
+					if not solution_flyout:
+						self.log_status("Solution content did not load properly, trying next post if available.", "warn")
+						continue
+					self.log_status("Solution content loaded, looking for code blocks...")
+					# Find for code blocks in the solution content by class if not found continue to next post
+					time.sleep(1.5) # wait for content to fully render
+					block_divs = solution_flyout.find_element(By.XPATH, './div/div/div/div[2]/div/div[1]/div[2]/div/div/div/div').find_elements(By.XPATH, './div') # get the actual code block element which is the second div inside the container
+					if not block_divs:
+						self.log_status("No code blocks found in this solution post, trying next post if available.", "warn")
+						all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
+							EC.presence_of_element_located((By.XPATH, './div/div/div/div[1]/div[1]'))
+						) # wait for the flyout which contains all solutions to load
+						all_solutions_flyout.click() # click it to open the sidebar which contains the list of all solutions which usually triggers the content to load properly and show the code blocks, then try finding the code block again
+						time.sleep(1) # wait for content to load after clicking
+						continue
+					try:
+						python_code_block = block_divs[0].find_elements(By.CLASS_NAME, 'language-python')
+						if not python_code_block:
+							self.log_status("No Python code block found in this solution post, trying next post if available.", "warn")
+							all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
+								EC.presence_of_element_located((By.XPATH, './div/div/div/div[1]/div[1]'))
+							) # wait for the flyout which contains all solutions to load
+							all_solutions_flyout.click() # click it to open the sidebar which contains the list of all solutions which usually triggers the content to load properly and show the code blocks, then try finding the code block again
+							time.sleep(1) # wait for content to load after clicking
+							continue
+						solution_text = python_code_block[0].text.strip()
+					except Exception as e_code:
+						self.log_status(f"Error extracting code block text: {e_code}", "warn")
+						solution_text = None
+					if solution_text:
+						self.log_status(f"Successfully extracted a Python3 solution from user solutions: {solution_text[:120]}\n.\n.\n.\n{solution_text[-120:]}") # Log the first 120 and last 120 chars of the solution for verification
+					else:
+						solution_text = self.driver.execute_script("""
+							return document.querySelector("code.language-python").innerText;
+						""")
+					return solution_text
+
+				except StaleElementReferenceException as e_post:
+					self.log_status(f"Solution post stale, retrying... -> {e_post}", "warn")
+					time.sleep(0.5)
+					continue
+				except Exception as e_post:
+					self.log_status(f"Solution post skipped!! -> {e_post}", "warn")
+					try:
+						all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
+							EC.presence_of_element_located((By.XPATH, './div/div/div/div[1]/div[1]'))
+						) # wait for the flyout which contains all solutions to load
+						all_solutions_flyout.click() # click it to open the sidebar which contains the list of all solutions which usually triggers the content to load properly and show the code blocks, then try finding the code block again
+						time.sleep(1) # wait for content to load after clicking
+					except Exception:
+						pass
+					continue
+				finally:
+					time.sleep(0.75) # small delay before trying the next post if available
+			return None
+
+		except Exception as e_solution:
+			self.log_status(f"Error accessing solutions: {e_solution}", "warn")
+			return None
+		
+	def paste_solution_into_editor(self, solution):
+		# paste the solution into the editor using the string we extracted from the solution post.
+		if not self.driver:
+			self.log_status("Driver not available. Cannot paste solution.", "warn")
+			return False
+		try:
+			editor_locators = [
+				(By.XPATH, '//*[@id="editor"]/div[2]/div[1]/div/div/div[1]/div[2]/div[1]/div[5]'),
+				(By.CSS_SELECTOR, ".monaco-editor"),
+				(By.XPATH, '//*[@id="editor"]/div[2]//div[@role="textbox"]'),
+				(By.CSS_SELECTOR, "#editor [contenteditable='true']"),
+			]
+			editor_flyout = self.wait_for_any(editor_locators, self.thread_config["timeout"], "editor textbox")
+			if not editor_flyout:
+				return False
+			self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", editor_flyout)
+			self.driver.execute_script("arguments[0].click();", editor_flyout)
+			time.sleep(0.5)
+
+			# Prefer JS injection for Monaco editor to avoid non-interactable errors.
+			injected = self.driver.execute_script(
+				"""
+				const code = arguments[0];
+				try {
+					if (window.monaco && monaco.editor && monaco.editor.getModels().length) {
+						monaco.editor.getModels()[0].setValue(code);
+						return true;
+					}
+					const editor = document.querySelector('.monaco-editor');
+					const textarea = editor ? editor.querySelector('textarea') : null;
+					if (textarea) {
+						textarea.focus();
+						textarea.value = code;
+						textarea.dispatchEvent(new Event('input', { bubbles: true }));
+						return true;
+					}
+				} catch (e) {}
+				return false;
+				""",
+				solution
+			)
+			if injected:
+				self.log_status("Injected solution into Monaco editor via JS.")
+			else:
+				editor_flyout.send_keys(Keys.CONTROL, 'a')
+				time.sleep(0.5)
+				editor_flyout.send_keys(solution)
+				self.log_status("Typed solution into editor.")
+			time.sleep(1)
+			return True
+
+		except Exception as e_editor:
+			self.log_status(f"Error pasting solution into editor: {e_editor}", "warn")
+			self.show_info("Leetcode Bot", "Could not paste solution into editor. Bot logic to solve the problem will be added in a future update.")
+			return False
+
+	def confirm_submission_result(self):
+		"""Checks the result of the submission and logs it."""
+		# Checks for "testcases passed" text in the flyout
+		if not self.driver:
+			self.log_status("Driver not available. Cannot confirm submission result.", "warn")
+			return
+
+		self.log_status("Checking submission result...")
+		results_container = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+			EC.presence_of_element_located((By.XPATH, '//*[@data-e2e-locator="submission-result"]'))
+		)
+		if results_container:
+			self.log_status("Successfully submitted solution. Confirming submission result...")
+			try:
+				testcase_passed_check = WebDriverWait(results_container, self.thread_config["timeout"]).until(
+					EC.presence_of_element_located((By.XPATH, './../div/span'))
+				)
+				if not testcase_passed_check:
+					self.log_status("Could not find submission result. It may still be processing.", "warn")
+					return False
+				self.log_status(f"Submission result: {testcase_passed_check.text.strip()}")
+			except Exception as e_result:
+				self.log_status(f"Could not retrieve submission result: {e_result}", "warn")
+				return False
+		else:
+			self.log_status("Wrong answer submitted!!!", "warn")
+			self.show_info("Leetcode Bot", "Submitted wrong solution. Please submit correct solution manually on Leetcode.")
+			return False
+		return True
+
+	def run_leetcode_bot(self):
+		"""Leetcode daily question solver"""
+		if not self.driver:
+			self.log_status("Driver not available. Cannot run Leetcode bot.", "warn")
+			return
+		self.driver.get("https://leetcode.com/problemset/")
+		nav_locators = [
+			(By.CSS_SELECTOR, "nav"),
+			(By.XPATH, "//nav//a[contains(., 'Daily')]"),
+			(By.XPATH, "//*[@id='leetcode-navbar']")
+		]
+		self.wait_for_any(nav_locators, self.thread_config["timeout"], "leetcode navbar")
+
+		# check login status first before trying to navigate to the page
+		self.log_status("Checking Leetcode login status...")
+		if not self.check_leetcode_login_status():
+			self.log_status("Not logged into Leetcode. Please log in and try again.", "warn")
+			self.show_info("Leetcode Login Required", "Please log into Leetcode in your Edge browser and run the bot again.")
+			return
+
+		self.log_status("Logged into Leetcode. Navigating to daily question...")
+		try:
+			if self.cancel_event.is_set():
+				return
+			# "Daily Challenge" link in the navbar
+			daily_locators = [
+				(By.XPATH, "//*[@id='__next']/div[2]/div/div/div[3]/nav/div[3]/div[2]/div[3]/button/a"),
+				(By.CSS_SELECTOR, "a[href*='daily-question']")
+			]
+			daily_link_button = self.wait_for_any(daily_locators, self.thread_config["timeout"], "daily link", clickable=True)
+			if not daily_link_button:
+				return
+			try:
+				href = daily_link_button.get_attribute("href")
+				if href:
+					self.log_status(f"Navigating to: {href}")
+					self.driver.get(href)
+				else:
+					self.log_status("Could not click daily link. Please click it manually.", "warn")
+					time.sleep(5) # wait for manual navigation
+			except Exception:
+				daily_link_button.find_element(By.XPATH, "./..").click() # try clicking the parent element if the link itself is not clickable
+				time.sleep(3)
+				self.driver.switch_to.window(self.driver.window_handles[-1])
+				self.log_status(f"Navigating to: {self.driver.current_url}")
+			finally:
+				editor_locators = [
+					(By.ID, "editor"),
+					(By.XPATH, "//*[@id='editor']//button"),
+					(By.CSS_SELECTOR, "div[class*='editor']")
+				]
+				if not self.wait_for_any(editor_locators, self.thread_config["timeout"], "editor load"):
+					return
+				self.log_status("Daily question page loaded.")
+
+
+			# switch the editor to python3 (if not already) by clicking the language dropdown and selecting python3
+			if not self.select_python_in_editor():
+				self.log_status("Failed to select Python3 in editor.", "warn")
+				return
+
+			# Get solution from the user posted solutions (if any) and try to extract a python3 solution. This is a bit hacky but leetcode doesn't make it easy to get the official solution content without subscribing, but many users post their own solutions in the solution section which we can scrape.
+			solution: str|None = self.get_solution_from_solutions()
+			if not solution:
+				self.log_status("No Python3 solution found. Cannot proceed with solving the problem.", "warn")
+				self.show_info("Leetcode Bot", "Could not find a Python3 solution in the user solutions. Bot logic to solve the problem will be added in a future update.")
+				return
+
+			# copy the solution to clipboard and paste it into the editor
+			try:
+				pyperclip.copy(solution)
+				self.log_status("Copied solution to clipboard.")
+			except Exception as e_clipboard:
+				self.log_status(f"Error copying solution to clipboard: {e_clipboard}", "warn")
+				self.show_info("Leetcode Bot", "Could not copy solution to clipboard. Bot logic to solve the problem will be added in a future update.")
+				return
+
+			if not self.paste_solution_into_editor(solution):
+				self.log_status("Failed to paste solution into editor.", "warn")
+				return
+
+			# clicking the submit button
+			try:
+				submit_locators = [
+					(By.XPATH, '//*[@id="ide-top-btns"]//button'),
+					(By.XPATH, '//*[@data-e2e-locator="console-submit-button"]')
+				]
+				submit_button = self.wait_for_any(submit_locators, self.thread_config["timeout"], "submit button", clickable=True)
+				if not submit_button:
+					return
+				submit_button.click()
+				time.sleep(3)
+			except Exception as e_submit:
+				self.log_status(f"Error clicking submit button: {e_submit}", "warn")
+				self.show_info("Leetcode Bot", "Could not click submit button. Bot logic to solve the problem will be added in a future update.")
+				return
+			try:
+				if not self.confirm_submission_result():
+					self.log_status("Could not confirm submission result. Please check Leetcode manually.", "warn")
+					self.show_info("Leetcode Bot", "Submitted solution but could not confirm result. Please check Leetcode manually.")
+				else:
+					self.log_status("Submission result confirmed successfully.")
+					self.prompt_close_driver()
+			except Exception as e_confirm:
+				self.log_status(f"Error confirming submission result: {e_confirm}", "warn")
+				self.show_info("Leetcode Bot", "Submitted solution but an error occurred while confirming result. Please check Leetcode manually.")
+
+		except Exception as e:
+			self.log_status(f"Error during Leetcode bot operation: {e}", "warn")
+			self.show_error("Leetcode Bot Error", f"An error occurred while running the Leetcode bot:\n{e}")
+		
 
 # --- Main Execution ---
 if __name__ == "__main__":

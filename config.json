@@ -1,10 +1,11 @@
 {
-    "profile_path": "",
-    "driver_path": "",
-    "binary_path": "",
+    "profile_path": "C:/Users/yatha/AppData/Local/Microsoft/Edge/User Data/Default",
+    "driver_path": "D:/PATH/msedgedriver.exe",
+    "binary_path": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
     "headless": true,
-    "num_searches": 10,
+    "num_searches": 20,
     "timeout": 10,
     "do_searches": true,
-    "do_offers": false
+    "do_offers": false,
+    "do_leetcode": true
 }
