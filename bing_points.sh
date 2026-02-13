@@ -5,5 +5,8 @@ cd current_directory
 # Activate the virtual environment
 source .venv/bin/activate
 
+echo "Installing dependencies..."
+pip install -r req.txt
+
 # Run the main python script
 python main.py
