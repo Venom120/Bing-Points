@@ -137,6 +137,31 @@ class BingPointsApp(tk.Tk):
 		except Exception as e:
 			self.show_error("Save Error", f"Failed to save config: {e}")
 
+	def mixed_text(self, parent_frame, multiple_text: list[tuple[str, str]]):
+		"""Create a row of labels with mixed colors. Returns list of labels."""
+		labels: list[ttk.Label] = []
+		for color, text in multiple_text:
+			label = ttk.Label(parent_frame, text=text, foreground=color)
+			label.pack(side="left", anchor="w")
+			labels.append(label)
+		return labels
+
+	def update_mixed_text(self, parent_frame, labels: list[ttk.Label], multiple_text: list[tuple[str, str]]):
+		"""Update mixed-color labels; recreate if counts differ."""
+		if len(labels) != len(multiple_text):
+			for label in labels:
+				label.destroy()
+			labels.clear()
+			for color, text in multiple_text:
+				label = ttk.Label(parent_frame, text=text, foreground=color)
+				label.pack(side="left", anchor="w")
+				labels.append(label)
+			return labels
+		for label, (color, text) in zip(labels, multiple_text):
+			label.config(text=text, foreground=color)
+		return labels
+		
+
 	def create_widgets(self):
 		"""Creates and lays out all UI elements."""
 		main_frame = ttk.Frame(self, padding="10")
@@ -162,42 +187,56 @@ class BingPointsApp(tk.Tk):
 		# Options
 		options_frame = ttk.Frame(settings_frame)
 		options_frame.pack(fill="x", expand=True) # Allow options_frame to expand
-		ttk.Checkbutton(options_frame, text="Run Headless (in background)", variable=self.vars["headless"]).pack(side="left", padx=5)
-		ttk.Checkbutton(options_frame, text="Perform Searches", variable=self.vars["do_searches"]).pack(side="left", padx=5)
 
-		# Collect Offers option
-		offers_checkbox = ttk.Checkbutton(options_frame, variable=self.vars["do_offers"])
-		offers_checkbox.state(["disabled"])
-		offers_checkbox.pack(side="left", padx=5)
-		# Mixed text for special offers with disabled state and "coming soon" note
-		offers_L1 = ttk.Label(options_frame, text="Collect Offers")
-		offers_L1.state(["disabled"])
-		offers_L1.pack(side="left")
-		offers_checkbox.state(['disabled']) # Disable offers for now
+		ttk.Checkbutton(options_frame, text="Run Headless (in background)", variable=self.vars["headless"]).pack(side="left", padx=5) # Headless option
+		ttk.Checkbutton(options_frame, text="Perform Searches", variable=self.vars["do_searches"], command=self.update_widget_states).pack(side="left", padx=5) # Search option
+		ttk.Checkbutton(options_frame, text="Collect Offers", variable=self.vars["do_offers"]).pack(side="left", padx=5) # Collect Offers option
+		ttk.Checkbutton(options_frame, text="Leetcode Bot", variable=self.vars["do_leetcode"], command=self.update_widget_states).pack(side="left", padx=5) # Leetcode Bot option
 
-		offers_L2 = ttk.Label(options_frame, text=" (Coming soon)", font=font.Font(size=8, slant="italic"))
-		offers_L2.state(["disabled"])
-		offers_L2.pack(side="left", anchor="w")
-
-		# Leetcode Bot option
-		ttk.Checkbutton(options_frame, text="Leetcode Bot", variable=self.vars["do_leetcode"]).pack(side="left", padx=5)
-
-		
 		# Numeric settings
 		numeric_frame = ttk.Frame(settings_frame)
 		numeric_frame.pack(fill="x", pady=5, expand=True) # Allow numeric_frame to expand
-		ttk.Label(numeric_frame, text="Number of Searches:").pack(side="left", padx=5)
-		ttk.Spinbox(numeric_frame, from_=1, to=25, width=5, textvariable=self.vars["num_searches"]).pack(side="left", padx=5)
+
+		self.search_count_label = ttk.Label(numeric_frame, text="Number of Searches:")
+		self.search_count_label.pack(side="left", padx=5)
+		self.search_count_spinbox = ttk.Spinbox(numeric_frame, from_=1, to=25, width=5, textvariable=self.vars["num_searches"])
+		self.search_count_spinbox.pack(side="left", padx=5)
+
 		ttk.Label(numeric_frame, text="Page Timeout (sec):").pack(side="left", padx=5)
 		ttk.Spinbox(numeric_frame, from_=5, to=60, width=5, textvariable=self.vars["timeout"]).pack(side="left", padx=5)
 
 		# --- Info Note ---
-		info_label = ttk.Label(main_frame,
-							   text="Important: Ensure you are logged into your Microsoft account in the Edge profile you select.",
-							   font=("TkDefaultFont", 9, "italic"),
-							   wraplength=650,
-							   foreground="red")
-		info_label.grid(row=2, column=0, sticky="ew", pady=(5, 10)) # Use grid for info_label
+		info_labels = ttk.Frame(main_frame)
+		info_labels.grid(row=2, column=0, sticky="ew", pady=5)
+		info_labels.columnconfigure(0, weight=1)
+
+		microsoft_line = ttk.Frame(info_labels)
+		microsoft_line.grid(row=0, column=0, sticky="ew", pady=(5, 0))
+		self.microsoft_info_labels = self.mixed_text(
+			microsoft_line,
+			[
+				("red", "Important: "),
+				("black", "Ensure you are logged into your "),
+				("#4d8cf4", "Microsoft "),
+				("black", "account in the Edge profile you select.")
+			]
+		)
+		for label in self.microsoft_info_labels:
+			label.config(font=("TkDefaultFont", 9, "italic"), wraplength=650)
+
+		self.leetcode_info_line = ttk.Frame(info_labels)
+		self.leetcode_info_line.grid(row=1, column=0, sticky="ew", pady=(5, 0))
+		self.leetcode_info_labels = self.mixed_text(
+			self.leetcode_info_line,
+			[
+				("red", "Important: "),
+				("black", "Ensure you are logged into your "),
+				("#dc6128", "Leetcode "),
+				("black", "account in the Edge profile you select.")
+			]
+		)
+		for label in self.leetcode_info_labels:
+			label.config(font=("TkDefaultFont", 9, "italic"), wraplength=650)
 
 		# --- Controls ---
 		control_frame = ttk.Frame(main_frame)
@@ -224,6 +263,29 @@ class BingPointsApp(tk.Tk):
 		status_bar = ttk.Frame(self, relief="sunken", padding=(5, 2))
 		status_bar.pack(side="bottom", fill="x")
 		ttk.Label(status_bar, textvariable=self.vars["status"]).pack(side="left", fill="x", expand=True) # Allow status label to expand
+
+	def update_widget_states(self):
+		"""Enables/disables widgets based on current settings"""
+		if self.vars["do_searches"].get():
+			self.search_count_label.config(state="normal")
+			self.search_count_spinbox.config(state="normal")
+		else:
+			self.search_count_label.config(state="disabled")
+			self.search_count_spinbox.config(state="disabled")
+
+		if self.vars["do_leetcode"].get():
+			self.update_mixed_text(
+				self.leetcode_info_line,
+				self.leetcode_info_labels,
+				[
+					("red", "Important: "),
+					("black", "Ensure you are logged into your "),
+					("#dc6128", "Leetcode "),
+					("black", "account in the Edge profile you select.")
+				]
+			)
+		else:
+			self.update_mixed_text(self.leetcode_info_line, self.leetcode_info_labels, [])
 
 	def create_path_entry(self, parent, label_text, var_key, browse_command, row):
 		"""Helper to create a label, entry, and browse button row."""
@@ -715,51 +777,63 @@ class BingPointsApp(tk.Tk):
 				self.driver.switch_to.window(initial_tab)
 				time.sleep(0.5)
 
-	def find_offers(self):
+	def find_offer(self):
 		"""Finds clickable offer elements in the offers flyout."""
 		if not self.driver:
 			self.log_status("Driver not available. Cannot find offers.", "warn")
 			return []
 
-		offers = []
+		self.driver.get("https://www.bing.com/rewards/panelflyout")
 		try:
-			all_offers_div = self.driver.find_elements(By.XPATH, '//*[@class="flyout_control_halfUnit"]')[-1]
+			all_offers_div = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+				EC.presence_of_element_located((By.XPATH, '//*[@class="flyout_control_halfUnit"]'))
+			)
 			all_offers = all_offers_div.find_elements(By.XPATH, './div')
 			
 			for div in all_offers:
 				try:
-					aria_label = div.get_attribute("aria-label")
-					div_id = div.get_attribute('id')
-					
+					aria_label = str(div.get_attribute("aria-label"))
+					div_id = str(div.get_attribute('id'))
+					class_name = str(div.get_attribute('class'))
+
 					if div_id == "exclusive_promo_cont":
-						check_alt = div.find_element(By.TAG_NAME, 'img').get_attribute('alt')
-						if check_alt == "Locked Image":
-							a_tag = div.find_element(By.TAG_NAME, 'a')
-							offers.append((a_tag, str(aria_label).split("-")[0].strip()))
-					elif aria_label is not None and "Offer not Completed" in aria_label:
+						check_locked = div.find_element(By.TAG_NAME, 'img')
+						if check_locked.get_attribute('alt') == "Locked Image" or check_locked.get_attribute('class') == "locked_img":
+							continue # Skip locked exclusive promo
+
+					if aria_label.lower() == "Turn referrals into Rewards - Offer not Completed":
+						continue # Skip referral offer
+
+					elif "slim" not in class_name and "Offer not Completed" in aria_label:
 						a_tag = div.find_element(By.TAG_NAME, 'a')
-						offers.append((a_tag, aria_label.split("-")[0].strip()))
+						return (a_tag, aria_label.split("-")[0].strip())
+
 				except Exception as e_offer:
 					self.log_status(f"Error parsing one offer: {e_offer}", "warn")
 			
-			self.log_status(f"Found {len(offers)} offers.")
+			self.log_status(f"Found 0 offers.")
 		except Exception as e_find:
 			self.show_error("Offer Error", f"Could not find offers container: {e_find}")
-		return offers
+		return None
 
 	def collect_special_offers(self, initial_tab):
 		"""Clicks through all available special offers."""
-		return
 		if not self.driver:
 			self.log_status("Driver not available. Skipping offers.", "warn")
 			return
 
 		self.log_status("Checking for special offers...")
 		try:
-			# Get the list of all href from the child divs and their aria-labels to determine which are offers not collected yet
-			offers = self.find_offers()
-			
-
+			offer = self.find_offer()
+			while offer:
+				offer_element, offer_label = offer
+				self.log_status(f"Attempting to click offer: {offer_label}")
+				try:
+					offer_element.click()
+					time.sleep(2)
+				except Exception as e_click:
+					self.log_status(f"Failed to click offer '{offer_label}': {e_click}", "warn")
+				offer = self.find_offer() # Look for next offer after clicking
 
 		except Exception as e:
 			self.log_status(f"Error during offer collection -> {e}", "warn")
