@@ -785,10 +785,11 @@ class BingPointsApp(tk.Tk):
 
 		self.driver.get("https://www.bing.com/rewards/panelflyout")
 		try:
-			all_offers_div = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
-				EC.presence_of_element_located((By.XPATH, '//*[@class="flyout_control_halfUnit"]'))
+			WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+				EC.presence_of_element_located((By.XPATH, '//*[@id="bingRewards"]/div/div[@class="flyout_control_halfUnit"]'))
 			)
-			all_offers = all_offers_div.find_elements(By.XPATH, './div')
+			offers_parent_div = self.driver.find_elements(By.XPATH, '//*[@id="bingRewards"]/div/div[@class="flyout_control_halfUnit"]')
+			all_offers = offers_parent_div[-1].find_elements(By.XPATH, './div')
 			
 			for div in all_offers:
 				try:
