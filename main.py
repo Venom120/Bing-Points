@@ -796,23 +796,24 @@ class BingPointsApp(tk.Tk):
 					aria_label = str(div.get_attribute("aria-label"))
 					div_id = str(div.get_attribute('id'))
 					class_name = str(div.get_attribute('class'))
+					a_tag = div.find_element(By.TAG_NAME, 'a')
 
 					if div_id == "exclusive_promo_cont":
 						check_locked = div.find_element(By.TAG_NAME, 'img')
-						if check_locked.get_attribute('alt') == "Locked Image" or check_locked.get_attribute('class') == "locked_img":
+						if check_locked.get_attribute('alt') == "Locked Image" \
+							or a_tag.find_elements(By.XPATH, './div[contains(@class, "slim")]'): # Check for already claimed exclusive promo
 							continue # Skip locked exclusive promo
+						return (a_tag, "Exclusive Promo")
 
 					if aria_label.lower() == "Turn referrals into Rewards - Offer not Completed":
 						continue # Skip referral offer
 
 					elif "slim" not in class_name and "Offer not Completed" in aria_label:
-						a_tag = div.find_element(By.TAG_NAME, 'a')
 						return (a_tag, aria_label.split("-")[0].strip())
 
 				except Exception as e_offer:
 					self.log_status(f"Error parsing one offer: {e_offer}", "warn")
 			
-			self.log_status(f"Found 0 offers.")
 		except Exception as e_find:
 			self.show_error("Offer Error", f"Could not find offers container: {e_find}")
 		return None
