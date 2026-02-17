@@ -6,7 +6,11 @@ cd current_directory
 source .venv/bin/activate
 
 echo "Installing dependencies..."
-pip install -r req.txt
-
+pip install -r req.txt --quiet
+if [ $? -eq 0 ]; then
+    echo "Dependencies installed successfully."
+else
+    echo "Dependencies already installed."
+fi
 # Run the main python script
 python main.py
