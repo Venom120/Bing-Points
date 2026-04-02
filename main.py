@@ -976,8 +976,8 @@ class BingPointsApp(tk.Tk):
 
 			# Wait for solution list container to appear
 			flyout_container = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
-				EC.presence_of_element_located((By.XPATH, '/html/body/div[1]/div[2]/div/div/div[4]/div/div/div[6]'))
-			) # wait for solution flyout to load
+				EC.presence_of_element_located((By.XPATH, '//*[@id="qd-content"]/div/div[6]'))
+			) # wait for solution flyout to load 
 
 			WebDriverWait(self.driver, self.thread_config["timeout"]).until(
 				EC.presence_of_element_located((By.XPATH, "(.//*[contains(@class,'group/ads')])")) # Wait for ad element to load which ensures that most solutions are loaded
@@ -987,6 +987,10 @@ class BingPointsApp(tk.Tk):
 			post_count = len(solution_posts)
 			for idx in range(1, post_count): # skip the first one since it's usually pinned
 				try:
+					# Wait for solution list to appear again in case of stale element after clicking a post
+					flyout_container = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+						EC.presence_of_element_located((By.XPATH, '//*[@id="qd-content"]/div/div[6]'))
+					) # wait for solution flyout to load 
 					fresh_posts = flyout_container.find_elements(By.XPATH, './div/div/div[3]/div[3]/div[1]/div')
 					if idx >= len(fresh_posts):
 						break
@@ -994,16 +998,24 @@ class BingPointsApp(tk.Tk):
 					post_title = post.find_element(By.XPATH, './div[1]/div/div[2]/div[2]/div/a')
 					post_title.click()
 					self.log_status("Opened a solution post.")
+
+					# Wait for solution list to appear again in case of stale element after clicking a post
+					flyout_container = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+						EC.presence_of_element_located((By.XPATH, '//*[@id="qd-content"]/div/div[6]'))
+					) # wait for solution flyout to load 
+					
 					solution_flyout = WebDriverWait(flyout_container, self.thread_config["timeout"]).until(
 						EC.presence_of_element_located((By.XPATH, './div[2]'))
-					) # wait for solution to load
+					) # wait for the flyout which contains the solution content to load
+
 					if not solution_flyout:
 						self.log_status("Solution content did not load properly, trying next post if available.", "warn")
 						continue
 					self.log_status("Solution content loaded, looking for code blocks...")
 					# Find for code blocks in the solution content by class if not found continue to next post
-					time.sleep(1.5) # wait for content to fully render
-					block_divs = solution_flyout.find_element(By.XPATH, './div/div/div/div[2]/div/div[1]/div[2]/div/div/div/div').find_elements(By.XPATH, './div') # get the actual code block element which is the second div inside the container
+					time.sleep(1.5) # wait for content to fully render //*[@id="d5c16f55-b59c-26e7-9735-294f8f41cbee"]/div[2]/div/div/div/div[2]/div/div[1]/div[2]/div/div/div/div
+					block_divs = solution_flyout.find_element(By.XPATH, './div/div/div/div[2]/div/div[1]/div[2]/div/div/div/div')
+				  # //*[@id="d5c16f55-b59c-26e7-9735-294f8f41cbee"]/div[2]/div/div/div/div[2]/div/div[1]/div[2]/div/div/div/div
 					if not block_divs:
 						self.log_status("No code blocks found in this solution post, trying next post if available.", "warn")
 						all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
@@ -1013,7 +1025,15 @@ class BingPointsApp(tk.Tk):
 						time.sleep(1) # wait for content to load after clicking
 						continue
 					try:
-						python_code_block = block_divs[0].find_elements(By.CLASS_NAME, 'language-python')
+						all_code_tabs = block_divs.find_elements(By.XPATH, './/div[contains(@class, "TabBarItem_item__jKpNv")]')
+						for tab in all_code_tabs:
+							# if python or python3 is in the tab text click it to switch to the python code block since some solutions have multiple code blocks for different languages and the default one may not be python
+							tab_text = tab.text.strip().lower()
+							if "python" in tab_text or "python3" in tab_text:
+								tab.click()
+								time.sleep(1) # wait for code block to switch to python if it's not already
+								break
+						python_code_block = block_divs.find_element(By.CLASS_NAME, 'language-python')
 						if not python_code_block:
 							self.log_status("No Python code block found in this solution post, trying next post if available.", "warn")
 							all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
@@ -1022,7 +1042,7 @@ class BingPointsApp(tk.Tk):
 							all_solutions_flyout.click() # click it to open the sidebar which contains the list of all solutions which usually triggers the content to load properly and show the code blocks, then try finding the code block again
 							time.sleep(1) # wait for content to load after clicking
 							continue
-						solution_text = python_code_block[0].text.strip()
+						solution_text = python_code_block.text.strip()
 					except Exception as e_code:
 						self.log_status(f"Error extracting code block text: {e_code}", "warn")
 						solution_text = None
@@ -1185,7 +1205,7 @@ class BingPointsApp(tk.Tk):
 					time.sleep(5) # wait for manual navigation
 			except Exception:
 				daily_link_button.find_element(By.XPATH, "./..").click() # try clicking the parent element if the link itself is not clickable
-				time.sleep(3)
+				time.sleep(2)
 				self.driver.switch_to.window(self.driver.window_handles[-1])
 				self.log_status(f"Navigating to: {self.driver.current_url}")
 			finally:
