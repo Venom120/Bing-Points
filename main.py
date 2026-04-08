@@ -1246,12 +1246,23 @@ class BingPointsApp(tk.Tk):
 
 			# clicking the submit button
 			try:
-				submit_locators = [
-					(By.XPATH, '//*[@id="ide-top-btns"]//button'),
-					(By.XPATH, '//*[@data-e2e-locator="console-submit-button"]')
-				]
-				submit_button = self.wait_for_any(submit_locators, self.thread_config["timeout"], "submit button", clickable=True)
+
+				""" Method 1 -> list of possible xpaths"""
+				# submit_locators = [
+				# 	(By.XPATH, '//*[@id="ide-top-btns"]/div[1]/div/div/div[2]/div/div[2]/div/div[3]/div[3]/div/button')
+				# 	(By.XPATH, '//*[@id="ide-top-btns"]//button'),
+				# 	(By.XPATH, '//*[@data-e2e-locator="console-submit-button"]'),
+				# ]
+				# submit_button = self.wait_for_any(submit_locators, self.thread_config["timeout"], "submit button", clickable=True)
+
+				""" Method 2 -> hardcoded xpath"""
+				submit_button = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+					EC.element_to_be_clickable((By.XPATH, '//*[@id="ide-top-btns"]/div[1]/div/div/div[2]/div/div[2]/div/div[3]/div[3]/div/button'))
+				)
+
 				if not submit_button:
+					self.log_status("Submit button not found. Cannot submit solution.", "warn")
+					self.show_info("Leetcode Bot", "Could not click submit button. Bot logic to solve the problem will be added in a future update.")
 					return
 				submit_button.click()
 				time.sleep(3)
