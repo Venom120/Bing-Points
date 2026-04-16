@@ -173,7 +173,7 @@ class BingPointsApp(tk.Tk):
 		main_frame.rowconfigure(3, weight=0) # Controls row
 
 		# --- Path Settings ---
-		path_frame = ttk.LabelFrame(main_frame, text="Path Settings", padding="10")
+		path_frame = ttk.LabelFrame(main_frame, text="Edge Path Settings", padding="10")
 		path_frame.grid(row=0, column=0, sticky="ew", pady=5) # Use grid for path_frame
 		path_frame.columnconfigure(1, weight=1) # Allow the entry column to expand
 

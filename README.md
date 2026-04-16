@@ -119,7 +119,7 @@ This command will:
 
 Once the application launches:
 
-1.  **Path Settings:**
+1.  ** Edge Path Settings:**
 
       * **Profile Path:** This is crucial. Click "Browse" and select your Microsoft Edge user data directory. This is typically found at:
           * **Windows:** `%LOCALAPPDATA%\Microsoft\Edge\User Data`
