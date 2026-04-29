@@ -188,9 +188,10 @@ class BingPointsApp(tk.Tk):
 		options_frame = ttk.Frame(settings_frame)
 		options_frame.pack(fill="x", expand=True) # Allow options_frame to expand
 
-		ttk.Checkbutton(options_frame, text="Run Headless (in background)", variable=self.vars["headless"]).pack(side="left", padx=5) # Headless option
+		self.headless_checkbutton = ttk.Checkbutton(options_frame, text="Run Headless (in background)", variable=self.vars["headless"])
+		self.headless_checkbutton.pack(side="left", padx=5) # Headless option
 		ttk.Checkbutton(options_frame, text="Perform Searches", variable=self.vars["do_searches"], command=self.update_widget_states).pack(side="left", padx=5) # Search option
-		ttk.Checkbutton(options_frame, text="Collect Offers", variable=self.vars["do_offers"]).pack(side="left", padx=5) # Collect Offers option
+		ttk.Checkbutton(options_frame, text="Collect Offers", variable=self.vars["do_offers"], command=self.update_widget_states).pack(side="left", padx=5) # Collect Offers option
 		ttk.Checkbutton(options_frame, text="Leetcode Bot", variable=self.vars["do_leetcode"], command=self.update_widget_states).pack(side="left", padx=5) # Leetcode Bot option
 
 		# Numeric settings
@@ -210,10 +211,10 @@ class BingPointsApp(tk.Tk):
 		info_labels.grid(row=2, column=0, sticky="ew", pady=5)
 		info_labels.columnconfigure(0, weight=1)
 
-		microsoft_line = ttk.Frame(info_labels)
-		microsoft_line.grid(row=0, column=0, sticky="ew", pady=(5, 0))
+		self.microsoft_info_line = ttk.Frame(info_labels)
+		self.microsoft_info_line.grid(row=0, column=0, sticky="ew", pady=(5, 0))
 		self.microsoft_info_labels = self.mixed_text(
-			microsoft_line,
+			self.microsoft_info_line,
 			[
 				("red", "Important: "),
 				("black", "Ensure you are logged into your "),
@@ -237,6 +238,9 @@ class BingPointsApp(tk.Tk):
 		)
 		for label in self.leetcode_info_labels:
 			label.config(font=("TkDefaultFont", 9, "italic"), wraplength=650)
+		
+		# Call update_widget_states to set initial state based on defaults
+		self.update_widget_states()
 
 		# --- Controls ---
 		control_frame = ttk.Frame(main_frame)
@@ -266,6 +270,7 @@ class BingPointsApp(tk.Tk):
 
 	def update_widget_states(self):
 		"""Enables/disables widgets based on current settings"""
+		# Handle search count spinbox state
 		if self.vars["do_searches"].get():
 			self.search_count_label.config(state="normal")
 			self.search_count_spinbox.config(state="normal")
@@ -273,6 +278,26 @@ class BingPointsApp(tk.Tk):
 			self.search_count_label.config(state="disabled")
 			self.search_count_spinbox.config(state="disabled")
 
+		# Handle Microsoft info visibility and headless checkbox state
+		if self.vars["do_searches"].get() or self.vars["do_offers"].get():
+			# Show Microsoft info and enable headless checkbox
+			self.update_mixed_text(
+				self.microsoft_info_line,
+				self.microsoft_info_labels,
+				[
+					("red", "Important: "),
+					("black", "Ensure you are logged into your "),
+					("#4d8cf4", "Microsoft "),
+					("black", "account in the Edge profile you select.")
+				]
+			)
+			self.headless_checkbutton.config(state="normal")
+		else:
+			# Hide Microsoft info and disable headless checkbox
+			self.update_mixed_text(self.microsoft_info_line, self.microsoft_info_labels, [])
+			self.headless_checkbutton.config(state="disabled")
+
+		# Handle Leetcode info visibility
 		if self.vars["do_leetcode"].get():
 			self.update_mixed_text(
 				self.leetcode_info_line,
@@ -856,13 +881,9 @@ class BingPointsApp(tk.Tk):
 			return False
 
 		try:
-			locators = [
-				(By.ID, "navbar_user_avatar"),
-				(By.CSS_SELECTOR, "img[alt*='avatar' i]"),
-				(By.CSS_SELECTOR, "[data-cy='navbar-avatar']"),
-				(By.XPATH, "//img[contains(@alt, 'Avatar') or contains(@alt, 'avatar')]")
-			]
-			avatar = self.wait_for_any(locators, self.thread_config["timeout"], "login avatar")
+			avatar = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+				EC.presence_of_element_located((By.ID, "navbar_user_avatar"))
+			)
 			return avatar is not None
 		except Exception:
 			return False
@@ -964,34 +985,55 @@ class BingPointsApp(tk.Tk):
 			python_filter = None
 			filters = initial_filter_tab.find_elements(By.XPATH, '../div[1]/span') # filter options
 			for f in filters:
-				if f.text.strip().lower() == "python3":
+				text = f.text.strip().lower()
+				if text == "python3" or text == "python":
 					python_filter = f
 					break
 			if python_filter:
 				python_filter.click()
 				self.log_status("Applied Python3 filter to solutions.")
-				time.sleep(1)
+				time.sleep(2)  # Increased wait to ensure filtering completes and solutions re-render
+				self.log_status("Waiting for filtered solutions to load...")
 			else:
-				self.log_status("Python3 filter not found in solutions. Continuing without filter.", "warn")
+				available_filters = [f.text.strip() for f in filters]
+				self.log_status(f"Python3 filter not found. Available filters: {available_filters}", "warn")
 
 			# Wait for solution list container to appear
 			flyout_container = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
 				EC.presence_of_element_located((By.XPATH, '//*[@id="qd-content"]/div/div[6]'))
 			) # wait for solution flyout to load 
+			
+			self.log_status("Solution flyout container found. Waiting for posts to render...")
+			# //*[@id="23df9cfb-9446-352d-672a-481995819d79"]/div/div/div[1]/div[3]/div[3]/div[1]/div[1]
+			time.sleep(3)  # Give the page extra time to render solution posts after filtering
 
-			WebDriverWait(self.driver, self.thread_config["timeout"]).until(
-				EC.presence_of_element_located((By.XPATH, "(.//*[contains(@class,'group/ads')])")) # Wait for ad element to load which ensures that most solutions are loaded
-			)
-			solution_posts = flyout_container.find_elements(By.XPATH, './div/div/div[3]/div[3]/div[1]/div') # get all solution posts
-			self.log_status(f"Found {len(solution_posts)} solution posts.")
+			# Try to find solution posts with multiple attempts
+			solution_posts = []
+			for attempt in range(3):
+				try:
+					solution_posts = flyout_container.find_elements(By.XPATH, './div/div/div[1]/div[3]/div[3]/div[1]/div')
+					if solution_posts:
+						self.log_status(f"Found {len(solution_posts)} solution posts on attempt {attempt + 1}.")
+						break
+					else:
+						self.log_status(f"Attempt {attempt + 1}: No solution posts found yet, retrying...")
+						time.sleep(2)
+				except Exception as e:
+					self.log_status(f"Attempt {attempt + 1}: Error finding posts - {e}", "warn")
+					time.sleep(2)
+			
+			if not solution_posts:
+				self.log_status("Could not find any solution posts after retries.", "warn")
+				return None
+			
 			post_count = len(solution_posts)
-			for idx in range(1, post_count): # skip the first one since it's usually pinned
+			for idx in range(1, post_count): # skip the first one since it's usually premium content
 				try:
 					# Wait for solution list to appear again in case of stale element after clicking a post
 					flyout_container = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
 						EC.presence_of_element_located((By.XPATH, '//*[@id="qd-content"]/div/div[6]'))
 					) # wait for solution flyout to load 
-					fresh_posts = flyout_container.find_elements(By.XPATH, './div/div/div[3]/div[3]/div[1]/div')
+					fresh_posts = flyout_container.find_elements(By.XPATH, './div/div/div[1]/div[3]/div[3]/div[1]/div')
 					if idx >= len(fresh_posts):
 						break
 					post = fresh_posts[idx]
@@ -1130,7 +1172,7 @@ class BingPointsApp(tk.Tk):
 
 		except Exception as e_editor:
 			self.log_status(f"Error pasting solution into editor: {e_editor}", "warn")
-			self.show_info("Leetcode Bot", "Could not paste solution into editor. Bot logic to solve the problem will be added in a future update.")
+			self.show_info("Leetcode Bot", "Could not paste solution into editor.")
 			return False
 
 	def confirm_submission_result(self):
@@ -1169,12 +1211,9 @@ class BingPointsApp(tk.Tk):
 			self.log_status("Driver not available. Cannot run Leetcode bot.", "warn")
 			return
 		self.driver.get("https://leetcode.com/problemset/")
-		nav_locators = [
-			(By.CSS_SELECTOR, "nav"),
-			(By.XPATH, "//nav//a[contains(., 'Daily')]"),
-			(By.XPATH, "//*[@id='leetcode-navbar']")
-		]
-		self.wait_for_any(nav_locators, self.thread_config["timeout"], "leetcode navbar")
+		WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+			EC.presence_of_element_located((By.XPATH, "//*[@id='leetcode-navbar']"))
+		)
 
 		# check login status first before trying to navigate to the page
 		self.log_status("Checking Leetcode login status...")
@@ -1188,12 +1227,12 @@ class BingPointsApp(tk.Tk):
 			if self.cancel_event.is_set():
 				return
 			# "Daily Challenge" link in the navbar
-			daily_locators = [
-				(By.XPATH, "//*[@id='__next']/div[2]/div/div/div[3]/nav/div[3]/div[2]/div[3]/button/a"),
-				(By.CSS_SELECTOR, "a[href*='daily-question']")
-			]
-			daily_link_button = self.wait_for_any(daily_locators, self.thread_config["timeout"], "daily link", clickable=True)
+			daily_link_button = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+				EC.element_to_be_clickable((By.XPATH, "//*[@id='leetcode-navbar']/div[1]/div/div/div[3]/button/a"))
+			)
+			time.sleep(1) # small delay before clicking
 			if not daily_link_button:
+				self.log_status("Daily Challenge link not found. Please try again.", "warn")
 				return
 			try:
 				href = daily_link_button.get_attribute("href")
@@ -1209,12 +1248,10 @@ class BingPointsApp(tk.Tk):
 				self.driver.switch_to.window(self.driver.window_handles[-1])
 				self.log_status(f"Navigating to: {self.driver.current_url}")
 			finally:
-				editor_locators = [
-					(By.ID, "editor"),
-					(By.XPATH, "//*[@id='editor']//button"),
-					(By.CSS_SELECTOR, "div[class*='editor']")
-				]
-				if not self.wait_for_any(editor_locators, self.thread_config["timeout"], "editor load"):
+				editor = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
+					EC.presence_of_element_located((By.ID, "editor"))
+				)
+				if not editor:
 					return
 				self.log_status("Daily question page loaded.")
 
@@ -1228,7 +1265,7 @@ class BingPointsApp(tk.Tk):
 			solution: str|None = self.get_solution_from_solutions()
 			if not solution:
 				self.log_status("No Python3 solution found. Cannot proceed with solving the problem.", "warn")
-				self.show_info("Leetcode Bot", "Could not find a Python3 solution in the user solutions. Bot logic to solve the problem will be added in a future update.")
+				self.show_info("Leetcode Bot", "Could not find a Python3 solution in the user solutions. Please submit a correct solution manually on Leetcode and try again.")
 				return
 
 			# copy the solution to clipboard and paste it into the editor
@@ -1237,11 +1274,12 @@ class BingPointsApp(tk.Tk):
 				self.log_status("Copied solution to clipboard.")
 			except Exception as e_clipboard:
 				self.log_status(f"Error copying solution to clipboard: {e_clipboard}", "warn")
-				self.show_info("Leetcode Bot", "Could not copy solution to clipboard. Bot logic to solve the problem will be added in a future update.")
+				self.show_info("Leetcode Bot", "Could not copy solution to clipboard. Please submit a correct solution manually on Leetcode and try again.")
 				return
 
 			if not self.paste_solution_into_editor(solution):
 				self.log_status("Failed to paste solution into editor.", "warn")
+				self.show_info("Leetcode Bot", "Could not paste solution into editor. Please submit a correct solution manually on Leetcode and try again.")
 				return
 
 			# clicking the submit button
@@ -1262,13 +1300,13 @@ class BingPointsApp(tk.Tk):
 
 				if not submit_button:
 					self.log_status("Submit button not found. Cannot submit solution.", "warn")
-					self.show_info("Leetcode Bot", "Could not click submit button. Bot logic to solve the problem will be added in a future update.")
+					self.show_info("Leetcode Bot", "Could not click submit button. Please submit a correct solution manually on Leetcode and try again.")
 					return
 				submit_button.click()
 				time.sleep(3)
 			except Exception as e_submit:
 				self.log_status(f"Error clicking submit button: {e_submit}", "warn")
-				self.show_info("Leetcode Bot", "Could not click submit button. Bot logic to solve the problem will be added in a future update.")
+				self.show_info("Leetcode Bot", "Could not click submit button. Please submit a correct solution manually on Leetcode and try again.")
 				return
 			try:
 				if not self.confirm_submission_result():
