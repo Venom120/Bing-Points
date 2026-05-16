@@ -1055,9 +1055,9 @@ class BingPointsApp(tk.Tk):
 						continue
 					self.log_status("Solution content loaded, looking for code blocks...")
 					# Find for code blocks in the solution content by class if not found continue to next post
-					time.sleep(1.5) # wait for content to fully render //*[@id="d5c16f55-b59c-26e7-9735-294f8f41cbee"]/div[2]/div/div/div/div[2]/div/div[1]/div[2]/div/div/div/div
+					time.sleep(1.5) # wait for content to fully render 
 					block_divs = solution_flyout.find_element(By.XPATH, './div/div/div/div[2]/div/div[1]/div[2]/div/div/div/div')
-				  # //*[@id="d5c16f55-b59c-26e7-9735-294f8f41cbee"]/div[2]/div/div/div/div[2]/div/div[1]/div[2]/div/div/div/div
+
 					if not block_divs:
 						self.log_status("No code blocks found in this solution post, trying next post if available.", "warn")
 						all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
@@ -1075,15 +1075,19 @@ class BingPointsApp(tk.Tk):
 								tab.click()
 								time.sleep(1) # wait for code block to switch to python if it's not already
 								break
-						python_code_block = block_divs.find_element(By.CLASS_NAME, 'language-python')
-						if not python_code_block:
-							self.log_status("No Python code block found in this solution post, trying next post if available.", "warn")
-							all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
-								EC.presence_of_element_located((By.XPATH, './div/div/div/div[1]/div[1]'))
-							) # wait for the flyout which contains all solutions to load
-							all_solutions_flyout.click() # click it to open the sidebar which contains the list of all solutions which usually triggers the content to load properly and show the code blocks, then try finding the code block again
-							time.sleep(1) # wait for content to load after clicking
-							continue
+							python_code_block = block_divs.find_element(By.CLASS_NAME, 'language-python')
+							if "class solution:" not in tab_text.lower():
+								if tab == all_code_tabs[-1]:
+									self.log_status("No Python can be parsed. Skipping Post", "warn")
+								continue # if the code block doesn't contain a class definition which is common in python solutions then it's likely not the correct code block, continue looking through tabs if available
+							if not python_code_block:
+								self.log_status("No Python code block found in this solution post, trying next post if available.", "warn")
+								all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
+									EC.presence_of_element_located((By.XPATH, './div/div/div/div[1]/div[1]'))
+								) # wait for the flyout which contains all solutions to load
+								all_solutions_flyout.click() # click it to open the sidebar which contains the list of all solutions which usually triggers the content to load properly and show the code blocks, then try finding the code block again
+								time.sleep(1) # wait for content to load after clicking
+								continue
 						solution_text = python_code_block.text.strip()
 					except Exception as e_code:
 						self.log_status(f"Error extracting code block text: {e_code}", "warn")
