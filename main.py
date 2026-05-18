@@ -1068,26 +1068,49 @@ class BingPointsApp(tk.Tk):
 						continue
 					try:
 						all_code_tabs = block_divs.find_elements(By.XPATH, './/div[contains(@class, "TabBarItem_item__jKpNv")]')
+						python_code_block = None
 						for tab in all_code_tabs:
-							# if python or python3 is in the tab text click it to switch to the python code block since some solutions have multiple code blocks for different languages and the default one may not be python
+							# if python or python3 is in the tab text click it to switch to the python code block
 							tab_text = tab.text.strip().lower()
 							if "python" in tab_text or "python3" in tab_text:
-								tab.click()
-								time.sleep(1) # wait for code block to switch to python if it's not already
-								break
-							python_code_block = block_divs.find_element(By.CLASS_NAME, 'language-python')
-							if "class solution:" not in tab_text.lower():
+								try:
+									tab.click()
+									time.sleep(1)  # wait for code block to switch to python if it's not already
+								except Exception:
+									pass
+								# try to locate a python code block after selecting the tab
+								try:
+									python_code_block = block_divs.find_element(By.CLASS_NAME, 'language-python')
+								except Exception:
+									python_code_block = None
+								if python_code_block:
+									break
+
+							# If tab text doesn't indicate python, continue searching other tabs
+							if "class solution:" not in tab_text:
 								if tab == all_code_tabs[-1]:
 									self.log_status("No Python can be parsed. Skipping Post", "warn")
-								continue # if the code block doesn't contain a class definition which is common in python solutions then it's likely not the correct code block, continue looking through tabs if available
-							if not python_code_block:
-								self.log_status("No Python code block found in this solution post, trying next post if available.", "warn")
+								continue
+
+						# final attempt: if no python code block was found via tabs, try to find one directly
+						if not python_code_block:
+							try:
+								python_code_block = block_divs.find_element(By.CLASS_NAME, 'language-python')
+							except Exception:
+								python_code_block = None
+
+						if not python_code_block:
+							self.log_status("No Python code block found in this solution post, trying next post if available.", "warn")
+							try:
 								all_solutions_flyout = WebDriverWait(solution_flyout, self.thread_config["timeout"]).until(
 									EC.presence_of_element_located((By.XPATH, './div/div/div/div[1]/div[1]'))
-								) # wait for the flyout which contains all solutions to load
-								all_solutions_flyout.click() # click it to open the sidebar which contains the list of all solutions which usually triggers the content to load properly and show the code blocks, then try finding the code block again
-								time.sleep(1) # wait for content to load after clicking
-								continue
+								)
+								all_solutions_flyout.click()
+								time.sleep(1)
+							except Exception:
+								pass
+							continue
+
 						solution_text = python_code_block.text.strip()
 					except Exception as e_code:
 						self.log_status(f"Error extracting code block text: {e_code}", "warn")
@@ -1095,9 +1118,7 @@ class BingPointsApp(tk.Tk):
 					if solution_text:
 						self.log_status(f"Successfully extracted a Python3 solution from user solutions: {solution_text[:120]}\n.\n.\n.\n{solution_text[-120:]}") # Log the first 120 and last 120 chars of the solution for verification
 					else:
-						solution_text = self.driver.execute_script("""
-							return document.querySelector("code.language-python").innerText;
-						""")
+						return None
 					return solution_text
 
 				except StaleElementReferenceException as e_post:
