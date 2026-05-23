@@ -1072,6 +1072,7 @@ class BingPointsApp(tk.Tk):
 						for tab in all_code_tabs:
 							# if python or python3 is in the tab text click it to switch to the python code block
 							tab_text = tab.text.strip().lower()
+							# If tab text doesn't indicate python, continue searching other tabs
 							if "python" in tab_text or "python3" in tab_text:
 								try:
 									tab.click()
@@ -1081,16 +1082,15 @@ class BingPointsApp(tk.Tk):
 								# try to locate a python code block after selecting the tab
 								try:
 									python_code_block = block_divs.find_element(By.CLASS_NAME, 'language-python')
+									if "class solution:" not in python_code_block.text.lower(): # crude check to see if it's actually a code block with a solution or just some text that has python syntax highlighting for some reason, if it's the latter continue searching other tabs
+										if tab == all_code_tabs[-1]:
+											self.log_status("No Python can be parsed. Skipping Post", "warn")
+										continue
 								except Exception:
 									python_code_block = None
 								if python_code_block:
 									break
 
-							# If tab text doesn't indicate python, continue searching other tabs
-							if "class solution:" not in tab_text:
-								if tab == all_code_tabs[-1]:
-									self.log_status("No Python can be parsed. Skipping Post", "warn")
-								continue
 
 						# final attempt: if no python code block was found via tabs, try to find one directly
 						if not python_code_block:
