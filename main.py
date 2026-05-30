@@ -1068,30 +1068,44 @@ class BingPointsApp(tk.Tk):
 						continue
 					try:
 						all_code_tabs = block_divs.find_elements(By.XPATH, './/div[contains(@class, "TabBarItem_item__jKpNv")]')
-						for tab in all_code_tabs:
-							python_code_block = None
-							# if python or python3 is in the tab text click it to switch to the python code block
-							tab_text = tab.text.strip().lower()
-							# If tab text doesn't indicate python, continue searching other tabs
-							if "python" in tab_text or "python3" in tab_text:
-								try:
-									tab.click()
-									time.sleep(1)  # wait for code block to switch to python if it's not already
-								except Exception:
-									pass
-								# try to locate a python code block after selecting the tab
-								try:
-									solution_tab_div = tab.find_element(By.XPATH, './../../div[2]/div') # the div which contains the code block for this tab
-									python_code_block = solution_tab_div.find_element(By.CLASS_NAME, 'language-python').text.strip()
-									if "class solution:" not in python_code_block \
-										and "return" not in python_code_block: # crude check to see if it's actually a code block with a solution or just some text that has python syntax highlighting for some reason, if it's the latter continue searching other tabs
-										if tab == all_code_tabs[-1]:
-											self.log_status("No Python solution Tab can be parsed. Skipping Post", "warn")
-										continue
-								except Exception:
-									python_code_block = None
-								if python_code_block:
-									break
+						self.log_status(f"Found {len(all_code_tabs)} code tabs in this solution post, looking for Python tab...")
+						if not all_code_tabs or len(all_code_tabs) == 0:
+							self.log_status("No code tabs found in this solution post, looking for global python solutions", "warn")
+							python_code_blocks = block_divs.find_elements(By.CLASS_NAME, 'language-python')
+							if python_code_blocks:
+								solution_text = python_code_blocks[0].text.strip()
+								if solution_text and "class solution:" in solution_text.lower() \
+									and "return" in solution_text.lower(): # crude check to see if it's actually a code block with a solution or just some text that has python syntax highlighting for some reason, if it's the latter continue searching other posts
+									self.log_status("Found a Python code block without tabs, using it as the solution.")
+								else:
+									self.log_status("Python code block found but does not appear to contain a valid solution, trying next post if available.", "warn")
+									continue
+
+						else:
+							for tab in all_code_tabs:
+								python_code_block = None
+								# if python or python3 is in the tab text click it to switch to the python code block
+								tab_text = tab.text.strip().lower()
+								# If tab text doesn't indicate python, continue searching other tabs
+								if "python" in tab_text or "python3" in tab_text:
+									try:
+										tab.click()
+										time.sleep(1)  # wait for code block to switch to python if it's not already
+									except Exception:
+										pass
+									# try to locate a python code block after selecting the tab
+									try:
+										solution_tab_div = tab.find_element(By.XPATH, './../../div[2]/div') # the div which contains the code block for this tab
+										python_code_block = solution_tab_div.find_element(By.CLASS_NAME, 'language-python').text.strip()
+										if "class solution:" not in python_code_block \
+											and "return" not in python_code_block: # crude check to see if it's actually a code block with a solution or just some text that has python syntax highlighting for some reason, if it's the latter continue searching other tabs
+											if tab == all_code_tabs[-1]:
+												self.log_status("No Python solution Tab can be parsed. Skipping Post", "warn")
+											continue
+									except Exception:
+										python_code_block = None
+									if python_code_block:
+										break
 
 						if not python_code_block:
 							self.log_status("No Python code block found in this solution post, trying next post if available.", "warn")
