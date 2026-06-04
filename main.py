@@ -503,7 +503,7 @@ class BingPointsApp(tk.Tk):
 					self.perform_trending_searches(initial_tab)
 					self.driver.switch_to.window(initial_tab)
 					self.driver.get("https://www.bing.com/") # Refresh
-					time.sleep(3)
+					time.sleep(2)
 				else:
 					self.log_status("[3/4] Skipping searches.")
 
@@ -778,11 +778,10 @@ class BingPointsApp(tk.Tk):
 			try:
 				original_handles = self.driver.window_handles
 				self.driver.execute_script("window.open('https://www.bing.com/', '_blank');")
-				time.sleep(1.25)
+				time.sleep(1) # Short wait for new tab to open
 				
 				new_tab_handle = [h for h in self.driver.window_handles if h not in original_handles][0]
 				self.driver.switch_to.window(new_tab_handle)
-				time.sleep(random.uniform(1, 3))
 
 				search_box = WebDriverWait(self.driver, self.thread_config["timeout"]).until(
 					EC.presence_of_element_located((By.NAME, "q"))
